@@ -1,6 +1,6 @@
 [package]
 name = "qimo-library"
-version = "0.1.0"
+version = "0.0.2"  # 版本号与 package.json 保持一致
 description = "EPUB Library Manager"
 authors = ["you"]
 edition = "2021"

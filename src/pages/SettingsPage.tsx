@@ -4,9 +4,10 @@ import { useBook } from '../context/BookContext';
 import { useLibrary } from '../hooks/useLibrary';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useState } from 'react';
-import { IconFolder, IconTrash, IconPlus } from '@tabler/icons-react';
+import { IconFolder, IconTrash, IconPlus, IconAlertTriangle } from '@tabler/icons-react';
 import { useTranslation } from '../hooks/useTranslation';
 import SignatureButton from '../components/decorative/SignatureButton';
+import { invoke } from '@tauri-apps/api/core';
 
 const SettingsPage: React.FC = () => {
   const { settings, updateSettings } = useSettings();
@@ -20,6 +21,10 @@ const SettingsPage: React.FC = () => {
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string>('');
   const [libraryName, setLibraryName] = useState<string>('');
+  
+  // 警告对话框状态
+  const [warningModalOpened, setWarningModalOpened] = useState(false);
+  const [pendingLibraryPath, setPendingLibraryPath] = useState<string>('');
 
   const handleSelectLibraryPath = async () => {
     try {
@@ -46,15 +51,77 @@ const SettingsPage: React.FC = () => {
     try {
       console.log('确认书库路径:', selectedPath);
       
+      // 检查文件夹状态
+      const status = await invoke<any>('check_library_folder_status', { libraryPath: selectedPath });
+      console.log('文件夹状态:', status);
+      
+      // 如果文件夹为空，直接创建书库
+      if (status.is_empty) {
+        await createLibrary(selectedPath);
+        return;
+      }
+      
+      // 如果文件夹不为空，检查是否是Qimo书库
+      if (status.is_qimo_library) {
+        // 是Qimo书库，直接读取
+        console.log('检测到Qimo书库，直接加载');
+        await createLibrary(selectedPath);
+        return;
+      }
+      
+      // 不是Qimo书库且不为空，弹出警告
+      console.log('文件夹不为空且不是Qimo书库，显示警告');
+      setPendingLibraryPath(selectedPath);
+      setWarningModalOpened(true);
+      
+    } catch (error) {
+      console.error('检查文件夹状态失败:', error);
+      alert(`检查文件夹失败: ${error}`);
+    }
+  };
+  
+  // 清空文件夹并创建书库
+  const handleClearAndCreate = async () => {
+    if (!pendingLibraryPath) return;
+    
+    try {
+      console.log('清空文件夹:', pendingLibraryPath);
+      
+      // 调用后端清空文件夹
+      await invoke('clear_folder', { libraryPath: pendingLibraryPath });
+      console.log('文件夹已清空');
+      
+      // 关闭警告对话框
+      setWarningModalOpened(false);
+      setPendingLibraryPath('');
+      
+      // 创建书库
+      await createLibrary(pendingLibraryPath);
+      
+    } catch (error) {
+      console.error('清空文件夹失败:', error);
+      alert(`清空文件夹失败: ${error}`);
+    }
+  };
+  
+  // 取消操作
+  const handleCancelWarning = () => {
+    setWarningModalOpened(false);
+    setPendingLibraryPath('');
+  };
+  
+  // 创建书库（内部函数）
+  const createLibrary = async (path: string) => {
+    try {
       // 初始化书库
-      await initializeLibrary(selectedPath);
+      await initializeLibrary(path);
       
       // 保存路径
-      await setLibraryPath(selectedPath);
+      await setLibraryPath(path);
       
-      // 添加为新书库
+      // 添加为新书库，并自动激活
       const name = libraryName || `书库 ${libraries.length + 1}`;
-      await addLibrary(name, selectedPath);
+      await addLibrary(name, path, true);  // autoActivate = true
       
       // 关闭modal
       setModalOpened(false);
@@ -62,6 +129,7 @@ const SettingsPage: React.FC = () => {
       setLibraryName('');
     } catch (error) {
       console.error('设置书库位置失败:', error);
+      throw error;
     }
   };
 
@@ -320,6 +388,95 @@ const SettingsPage: React.FC = () => {
               />
             </Group>
           )}
+        </Stack>
+      </Modal>
+      
+      {/* 警告对话框 */}
+      <Modal
+        opened={warningModalOpened}
+        onClose={handleCancelWarning}
+        title={
+          <Group gap="sm">
+            <IconAlertTriangle size={20} style={{ color: 'var(--accent-secondary)' }} />
+            <Text style={{ fontFamily: 'Playfair Display', color: 'var(--text-primary)' }}>文件夹非空 / Folder Not Empty</Text>
+          </Group>
+        }
+        centered
+        size="md"
+        styles={{
+          content: { borderRadius: 0, backgroundColor: 'var(--bg-primary)' },
+          header: { borderBottom: '1px solid var(--border-color)' }
+        }}
+      >
+        <Stack gap="md">
+          <Text size="sm" style={{ color: 'var(--text-primary)' }}>
+            选择的文件夹包含文件，但不是奇墨的书库。
+            <br />
+            The selected folder contains files but is not a Qimo library.
+          </Text>
+          
+          <Box style={{
+            padding: '12px',
+            backgroundColor: 'rgba(139, 58, 58, 0.1)',
+            borderLeft: '3px solid var(--accent-secondary)'
+          }}>
+            <Text size="xs" style={{ color: 'var(--text-secondary)', fontFamily: 'Courier Prime' }}>
+              {pendingLibraryPath}
+            </Text>
+          </Box>
+          
+          <Text size="sm" style={{ color: 'var(--text-secondary)' }}>
+            请选择以下操作之一：
+            <br />
+            Please choose one of the following actions:
+          </Text>
+          
+          <Stack gap="sm">
+            <Button
+              onClick={handleClearAndCreate}
+              leftSection={<IconTrash size={16} />}
+              style={{
+                borderRadius: 0,
+                backgroundColor: 'transparent',
+                borderColor: 'var(--accent-secondary)',
+                borderWidth: '1px',
+                color: 'var(--accent-secondary)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--accent-secondary)';
+                e.currentTarget.style.color = 'var(--bg-primary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = 'var(--accent-secondary)';
+              }}
+            >
+              清空文件夹并创建书库 / Clear and Create Library
+            </Button>
+            
+            <Button
+              onClick={handleCancelWarning}
+              style={{
+                borderRadius: 0,
+                backgroundColor: 'transparent',
+                borderColor: 'var(--border-color)',
+                borderWidth: '1px',
+                color: 'var(--text-secondary)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--border-color)';
+                e.currentTarget.style.color = 'var(--text-primary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = 'var(--text-secondary)';
+              }}
+            >
+              取消 / Cancel
+            </Button>
+          </Stack>
         </Stack>
       </Modal>
     </Box>

@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import SignatureButton from '../components/decorative/SignatureButton';
+import { useBook } from '../context/BookContext';
 
 interface WelcomeModalProps {
   onComplete: () => void;
 }
 
 const WelcomeModal: React.FC<WelcomeModalProps> = ({ onComplete }) => {
+  const { addLibrary } = useBook();
   const [selectedPath, setSelectedPath] = useState<string>('');
   const [step, setStep] = useState<1 | 2>(1);
   const [warningModalOpened, setWarningModalOpened] = useState(false);
@@ -51,11 +53,19 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ onComplete }) => {
     if (!selectedPath) return;
 
     try {
+      console.log('完成向导，初始化书库:', selectedPath);
+      
       // 初始化书库
       await invoke('initialize_library', { path: selectedPath });
+      console.log('书库已初始化');
       
       // 保存路径
       await invoke('set_library_path', { path: selectedPath });
+      console.log('路径已保存');
+      
+      // 添加为默认书库，并自动激活加载书籍
+      await addLibrary('默认书库', selectedPath, true);
+      console.log('书库已添加并激活，书籍已加载');
       
       // 完成向导
       onComplete();

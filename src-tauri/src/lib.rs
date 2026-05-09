@@ -117,6 +117,48 @@ async fn check_library_folder_status(library_path: String) -> Result<serde_json:
 }
 
 #[tauri::command]
+async fn clear_folder(library_path: String) -> Result<(), String> {
+    use std::fs;
+    use std::path::PathBuf;
+    
+    let path = PathBuf::from(&library_path);
+    
+    // 检查路径是否存在
+    if !path.exists() {
+        return Err("路径不存在".to_string());
+    }
+    
+    // 检查是否是目录
+    if !path.is_dir() {
+        return Err("路径不是目录".to_string());
+    }
+    
+    // 读取目录内容
+    let entries = fs::read_dir(&path)
+        .map_err(|e| format!("读取目录失败: {}", e))?;
+    
+    // 删除所有文件和子目录
+    for entry in entries {
+        if let Ok(entry) = entry {
+            let entry_path = entry.path();
+            
+            if entry_path.is_dir() {
+                // 递归删除子目录
+                fs::remove_dir_all(&entry_path)
+                    .map_err(|e| format!("删除子目录失败 {}: {}", entry_path.display(), e))?;
+            } else {
+                // 删除文件
+                fs::remove_file(&entry_path)
+                    .map_err(|e| format!("删除文件失败 {}: {}", entry_path.display(), e))?;
+            }
+        }
+    }
+    
+    println!("已清空文件夹: {}", library_path);
+    Ok(())
+}
+
+#[tauri::command]
 async fn get_library_path(app_handle: tauri::AppHandle) -> Result<Option<String>, String> {
     let store = StoreBuilder::new(&app_handle, "settings.json")
         .build()
@@ -215,7 +257,8 @@ pub fn run() {
             reset_first_launch,
             save_libraries_config,
             load_libraries_config,
-            check_library_folder_status
+            check_library_folder_status,
+            clear_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
