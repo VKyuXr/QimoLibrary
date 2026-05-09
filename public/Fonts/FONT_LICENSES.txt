@@ -1,0 +1,37 @@
+# 字体授权声明 / Font Licenses
+
+本项目 `public/Fonts` 目录下包含的字体文件遵循各自的开源许可证。
+The font files in the `public/Fonts` directory of this project are subject to their respective open source licenses.
+
+## 1. Playfair Display
+- **Author**: Claus Eggers Sørensen
+- **License**: SIL Open Font License, Version 1.1
+- **Source**: https://github.com/clauseggers/Playfair-Display
+
+## 2. Pinyon Script
+- **Author**: Sorkin Type
+- **License**: SIL Open Font License, Version 1.1
+- **Source**: https://github.com/SorkinType/Pinyon
+
+## 3. Courier Prime
+- **Author**: Quote-Unquote Apps
+- **License**: SIL Open Font License, Version 1.1
+- **Source**: https://github.com/quoteunquoteapps/CourierPrime
+
+## 4. Source Han Serif SC (思源宋体)
+- **Author**: Adobe & Google
+- **License**: SIL Open Font License, Version 1.1
+- **Source**: https://github.com/adobe-fonts/source-han-serif
+
+## 5. Source Han Sans SC (思源黑体)
+- **Author**: Adobe & Google
+- **License**: SIL Open Font License, Version 1.1
+- **Source**: https://github.com/adobe-fonts/source-han-sans
+
+## 6. Rondal
+- **License**: Free for commercial use (OFL or similar)
+- **Note**: Please refer to the original source for detailed license terms.
+
+---
+**注意**：本项目代码（Rust/React）采用 Apache License 2.0，但上述字体资源保留其原始授权。
+**Note**: The project code (Rust/React) is licensed under Apache License 2.0, but the above font resources retain their original licenses.

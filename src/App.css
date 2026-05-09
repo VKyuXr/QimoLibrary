@@ -1,0 +1,163 @@
+/* 字体导入 */
+@font-face {
+  font-family: 'Playfair Display';
+  src: url('/Fonts/PlayfairDisplay-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pinyon Script';
+  src: url('/Fonts/PinyonScript-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Courier Prime';
+  src: url('/Fonts/CourierPrime-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rondal';
+  src: url('/Fonts/RondalRegular-K7ORW.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Source Han Serif SC';
+  src: url('/Fonts/SourceHanSerifSC-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Source Han Serif SC';
+  src: url('/Fonts/SourceHanSerifSC-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Source Han Sans SC';
+  src: url('/Fonts/SourceHanSansSC-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* 亮模式 - 复古自然风格 */
+  --bg-primary: #FCFCF2;        /* cream-1 */
+  --bg-secondary: #E3E5BA;      /* sage-light-4 */
+  --border-color: #88865B;      /* earth-5 */
+  --text-primary: #39321D;      /* deep-brown-7 */
+  --text-secondary: #706445;    /* brown-dark-5 */
+  --accent-primary: #CAD086;    /* olive-4 */
+  --accent-secondary: #B98D57;  /* copper-5 */
+  --accent-warm: #A4A770;       /* olive-dark-5 */
+  --highlight: #E3E5BA;         /* sage-light-4 */
+  
+  font-family: 'Rondal', 'Source Han Serif SC', serif;
+  font-size: 16px;
+  line-height: 1.6;
+  font-weight: 400;
+
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 暗模式 - 深邃自然 */
+[data-mantine-color-scheme='dark'] {
+  --bg-primary: #39321D;        /* deep-brown-7 */
+  --bg-secondary: #564F34;      /* deep-brown-6 */
+  --border-color: #A4A770;      /* olive-dark-5 */
+  --text-primary: #FCFCF2;      /* cream-1 */
+  --text-secondary: #E3E5BA;    /* sage-light-4 */
+  --accent-primary: #CAD086;    /* olive-4 */
+  --accent-secondary: #B98D57;  /* copper-5 */
+  --accent-warm: #D4D9B3;       /* olive-3 */
+  --highlight: #564F34;         /* deep-brown-6 */
+  
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+}
+
+/* 全局噪点和波点纹理 */
+body {
+  background-image: 
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E"),
+    radial-gradient(circle, rgba(139,58,58,0.02) 1px, transparent 1px);
+  background-size: 200px 200px, 20px 20px;
+  background-attachment: fixed;
+}
+
+/* 选中项使用无衬线体加粗效果 */
+.selected-item {
+  font-family: 'Source Han Sans SC', sans-serif !important;
+  font-weight: 600 !important;
+}
+
+/* Logo SVG 颜色适配 */
+.logo-svg {
+  filter: brightness(0) saturate(100%) invert(14%) sepia(20%) saturate(1165%) hue-rotate(358deg) brightness(96%) contrast(86%);
+}
+
+[data-mantine-color-scheme='dark'] .logo-svg {
+  filter: brightness(0) saturate(100%) invert(95%) sepia(17%) saturate(469%) hue-rotate(358deg) brightness(96%) contrast(86%);
+}
+
+/* 优雅过渡动画 */
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 按钮悬停缩放效果 */
+.btn-hover-scale {
+  transition: transform 0.2s ease;
+}
+
+.btn-hover-scale:hover {
+  transform: scale(1.05);
+}
