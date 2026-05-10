@@ -602,9 +602,9 @@ const LibraryPage: React.FC = () => {
         onClose={() => setDeleteModalOpened(false)}
         title={<Text style={{ fontFamily: 'Playfair Display', color: 'var(--text-primary)' }}>确认删除 / Confirm Delete</Text>}
         centered
-        size="lg"
+        size="md"
         styles={{
-          content: { borderRadius: 0, backgroundColor: 'var(--bg-primary)', minWidth: '500px' },
+          content: { borderRadius: 0, backgroundColor: 'var(--bg-primary)' },
           header: { borderBottom: '1px solid var(--border-color)' }
         }}
       >
@@ -616,7 +616,7 @@ const LibraryPage: React.FC = () => {
               Are you sure you want to delete {selectedIds.size} selected book(s)? This action cannot be undone.
             </span>
           </Text>
-          <Group justify="flex-end" mt="md" gap="xl">
+          <Group justify="flex-end" mt="md" gap="xl" style={{ paddingRight: '20px' }}>
             <SignatureButton 
               text="取消 / Cancel"
               onClick={() => setDeleteModalOpened(false)}
