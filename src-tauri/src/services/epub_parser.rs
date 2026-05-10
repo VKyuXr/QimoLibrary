@@ -12,6 +12,7 @@ pub struct EpubMetadata {
     pub publisher: Option<String>,
     pub description: Option<String>,
     pub cover_data: Option<Vec<u8>>,
+    pub is_notebook: bool,
 }
 
 pub fn extract_epub_metadata(epub_path: &Path) -> Result<EpubMetadata, String> {
@@ -39,7 +40,6 @@ fn find_opf_path(archive: &mut ZipArchive<File>) -> Result<String, String> {
         .map_err(|e| format!("读取container.xml失败: {}", e))?;
     
     let mut reader = Reader::from_str(&content);
-    reader.trim_text(true);
     
     let mut buf = Vec::new();
     
@@ -83,7 +83,6 @@ fn parse_opf_metadata(archive: &mut ZipArchive<File>, opf_path: &str) -> Result<
     }; // opf_file在这里被释放
     
     let mut reader = Reader::from_str(&opf_content);
-    reader.trim_text(true);
     
     let mut title = String::new();
     let mut creator = String::new();
@@ -91,6 +90,7 @@ fn parse_opf_metadata(archive: &mut ZipArchive<File>, opf_path: &str) -> Result<
     let mut description: Option<String> = None;
     let mut cover_id: Option<String> = None;
     let mut manifest_items: Vec<(String, String)> = Vec::new();
+    let mut is_notebook = false;
     
     let mut buf = Vec::new();
     let mut in_metadata = false;
@@ -106,6 +106,27 @@ fn parse_opf_metadata(archive: &mut ZipArchive<File>, opf_path: &str) -> Result<
                 match tag_name.as_str() {
                     "metadata" => in_metadata = true,
                     "manifest" => in_manifest = true,
+                    "meta" => {
+                        if in_metadata {
+                            let mut name = String::new();
+                            let mut content_val = String::new();
+                            
+                            for attr in e.attributes().flatten() {
+                                let key = String::from_utf8_lossy(attr.key.as_ref()).to_string();
+                                let value = String::from_utf8_lossy(&attr.value).to_string();
+                                
+                                match key.as_str() {
+                                    "name" => name = value,
+                                    "content" => content_val = value,
+                                    _ => {}
+                                }
+                            }
+                            
+                            if name == "qimo-notebook" && content_val == "true" {
+                                is_notebook = true;
+                            }
+                        }
+                    }
                     "item" => {
                         if in_manifest {
                             let mut id = String::new();
@@ -241,12 +262,12 @@ fn parse_opf_metadata(archive: &mut ZipArchive<File>, opf_path: &str) -> Result<
         publisher,
         description,
         cover_data,
+        is_notebook,
     })
 }
 
 fn find_cover_via_meta(content: &str) -> Option<String> {
     let mut reader = Reader::from_str(content);
-    reader.trim_text(true);
     
     let mut buf = Vec::new();
     
@@ -274,7 +295,10 @@ fn find_cover_via_meta(content: &str) -> Option<String> {
                 }
             }
             Ok(Event::Eof) => break,
-            Err(_) => break,
+            Err(e) => {
+                eprintln!("[Warning] XML解析错误: {}", e);
+                break;
+            }
             _ => {}
         }
         buf.clear();

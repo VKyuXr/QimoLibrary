@@ -1,12 +1,18 @@
 # 奇墨 (Qimo) - 优雅的 EPUB 电子书阅读器
 
+<div align="center">
+  <img src="img/Qimo-logo.svg" alt="奇墨 Logo" width="200" />
+  <br />
+</div>
+
 **奇墨 (Qimo)** 是一款基于 Tauri 2.0 开发的跨平台桌面端 EPUB 电子书阅读器。它融合了复古自然的视觉设计与现代高效的阅读体验，致力于为用户提供一个纯净、隐私且高度可定制的本地阅读空间。
 
 ## ✨ 功能特性
 
 - **📚 智能书库管理**：支持多书库路径配置与一键切换，自动提取 EPUB 元数据（封面、作者、出版社及简介），让书籍整理井井有条。
 - **📖 沉浸式阅读体验**：基于 `epub.js` 深度定制，支持目录快速跳转、阅读进度自动记忆、窗口自适应布局以及独立的阅读器样式配置。
-- **🎨 复古自然美学**：独特的“复古自然”主题设计，精选 Playfair Display、Rondal 等多款优雅字体，配合细腻的噪点纹理背景，还原纸质书阅读质感。
+- **📝 内置笔记系统**：支持创建和管理 Markdown 格式的阅读笔记，页面化管理，实时预览，同步至 EPUB 文件，打造完整的知识管理体系。
+- **🎨 复古自然美学**：独特的"复古自然"主题设计，精选 Playfair Display、Rondal、智芒行书等多款优雅字体，配合细腻的噪点纹理背景，还原纸质书阅读质感。
 - **⚙️ 个性化设置**：提供明暗主题无缝切换、中英文双语界面支持，以及针对阅读器的专属字体与字号调整。
 - **🛡️ 本地化隐私保护**：所有数据均存储在本地，不上传任何用户信息，确保您的阅读记录绝对安全。
 
@@ -15,11 +21,20 @@
 ### 🏠 主页
 ![主页](img/home.png)
 
-### 📚 书库
+### 📚 书库（亮色主题）
 ![书库](img/library.png)
+
+### 🌙 书库（暗色主题）
+![书库暗色](img/library_dark.png)
 
 ### 📖 阅读器
 ![阅读器](img/reader.png)
+
+### 📝 笔记编辑器
+![笔记编辑器](img/notebook_editer.png)
+
+### ✏️ 元数据编辑
+![元数据编辑](img/edit_metadata.png)
 
 ## 🛠️ 技术栈
 
@@ -68,6 +83,18 @@ npm run tauri dev
 2. 点击右上角的 **导入书籍** 按钮（或通过菜单栏选择）。
 3. 在弹出的文件选择框中选中 `.epub` 格式文件，系统将自动解析并生成封面。
 
+### 创建笔记
+1. 在书库页面点击 **新建笔记** 按钮。
+2. 输入笔记名称，系统将自动生成标准 EPUB 格式的笔记文件。
+3. 点击笔记即可进入编辑器，开始编写您的阅读心得或知识总结。
+
+### 笔记编辑
+- **页面管理**：左侧显示所有笔记页面，可添加新页面或删除已有页面。
+- **Markdown 编辑**：中间区域支持 Markdown 语法编辑，实时渲染预览。
+- **目录导航**：右侧自动生成标题目录，点击即可快速跳转。
+- **自动保存**：每 3 秒自动保存一次，也可手动点击保存按钮。
+- **同步至 EPUB**：所有内容同步保存至 EPUB 文件，方便备份与分享。
+
 ### 阅读操作
 - **翻页**：点击屏幕两侧的翻页按钮，或使用键盘左右方向键。
 - **目录导航**：点击右侧的目录图标，可快速跳转至指定章节。
@@ -91,12 +118,14 @@ npm run tauri dev
 
 ### 字体授权
 本项目使用的字体均遵循其原始开源许可证（主要为 **SIL Open Font License 1.1**）：
-- **Playfair Display**: 由 Claus Eggers Sørensen 设计。
-- **Pinyon Script**: 由 Sorkin Type 设计。
-- **Courier Prime**: 由 Quote-Unquote Apps 设计。
-- **思源宋体 (Source Han Serif SC)**: 由 Adobe 与 Google 联合开发。
-- **思源黑体 (Source Han Sans SC)**: 由 Adobe 与 Google 联合开发。
-- **Rondal**: 免费可商用字体。
+- **Playfair Display**: 由 Claus Eggers Sørensen 设计，优雅的衬线字体。
+- **Pinyon Script**: 由 Sorkin Type 设计，流畅的手写体。
+- **Courier Prime**: 由 Quote-Unquote Apps 设计，经典的等宽字体。
+- **思源宋体 (Source Han Serif SC)**: 由 Adobe 与 Google 联合开发，高质量中文宋体。
+- **思源黑体 (Source Han Sans SC)**: 由 Adobe 与 Google 联合开发，高质量中文黑体。
+- **Rondal**: 免费可商用字体，圆润的无衬线字体。
+- **霞鹜文楷 (LXGW WenKai)**: 由 LXGW 开发，基于 Klee One 的开源中文字体，适合正文阅读。
+- **智芒行书 (Zhimang Xing)**: 优美的中文行书字体，用于装饰性文本。
 
 详细字体授权信息请参见 [public/Fonts/FONT_LICENSES.txt](public/Fonts/FONT_LICENSES.txt)。
 
@@ -106,4 +135,4 @@ npm run tauri dev
 - **[Mantine UI](https://mantine.dev/)**: 功能丰富且可定制的 React 组件库。
 
 ---
-*Made with ❤️ by Qimo Team*
+*Made with ❤️ by VKyuXr*

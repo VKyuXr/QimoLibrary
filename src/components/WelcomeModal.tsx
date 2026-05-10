@@ -1,4 +1,4 @@
-import { Box, Stack, Text, Button, Group, Modal } from '@mantine/core';
+import { Box, Stack, Text, Button, Group, Modal, TextInput } from '@mantine/core';
 import { IconBook, IconFolder, IconAlertTriangle } from '@tabler/icons-react';
 import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -13,6 +13,7 @@ interface WelcomeModalProps {
 const WelcomeModal: React.FC<WelcomeModalProps> = ({ onComplete }) => {
   const { addLibrary } = useBook();
   const [selectedPath, setSelectedPath] = useState<string>('');
+  const [libraryName, setLibraryName] = useState<string>('');
   const [step, setStep] = useState<1 | 2>(1);
   const [warningModalOpened, setWarningModalOpened] = useState(false);
   const [pendingPath, setPendingPath] = useState<string>('');
@@ -64,7 +65,10 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ onComplete }) => {
       console.log('路径已保存');
       
       // 添加为默认书库，并自动激活加载书籍
-      await addLibrary('默认书库', selectedPath, true);
+      // 如果用户没有输入名称，使用文件夹名作为书库名
+      const folderName = selectedPath.split(/[\\/]/).pop() || '默认书库';
+      const name = libraryName.trim() || folderName;
+      await addLibrary(name, selectedPath, true);
       console.log('书库已添加并激活，书籍已加载');
       
       // 完成向导
@@ -183,6 +187,21 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ onComplete }) => {
                   </span>
                 </Text>
               </Box>
+
+              <TextInput
+                label="书库名称 / Library Name"
+                placeholder="留空则使用文件夹名字 / Leave empty to use folder name"
+                value={libraryName}
+                onChange={(e) => setLibraryName(e.currentTarget.value)}
+                styles={{
+                  input: { 
+                    borderRadius: 0, 
+                    borderColor: 'var(--border-color)',
+                    color: 'var(--text-primary)'
+                  },
+                  label: { color: 'var(--text-primary)' }
+                }}
+              />
 
               <Box
                 style={{

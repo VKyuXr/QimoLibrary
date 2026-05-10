@@ -11,6 +11,7 @@ export interface BookMetadata {
   publisher?: string;
   added_time: string;
   file_path?: string; // 存储 EPUB 文件的绝对路径
+  is_notebook: boolean; // 是否为笔记（与Rust保持一致，非可选）
 }
 
 export const useLibrary = () => {

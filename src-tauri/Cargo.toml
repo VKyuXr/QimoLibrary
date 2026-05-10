@@ -27,7 +27,8 @@ tauri-plugin-store = "2"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 zip = "0.6"
-quick-xml = { version = "0.31", features = ["serialize"] }
+quick-xml = { version = "0.36", features = ["serialize"] }
+pulldown-cmark = "0.9"
 
 # 优化配置 - 减小构建体积
 [profile.dev]

@@ -87,9 +87,11 @@ export const BookProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setLibraryPathState(path);
             
             // 初始化默认书库配置（兼容旧数据）
+            // 使用文件夹名作为书库名称
+            const folderName = path.split(/[\\/]/).pop() || '默认书库';
             const defaultLibrary: LibraryConfig = {
               id: 'default',
-              name: '默认书库',
+              name: folderName,
               path: path,
               active: true
             };

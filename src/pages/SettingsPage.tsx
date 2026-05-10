@@ -120,7 +120,9 @@ const SettingsPage: React.FC = () => {
       await setLibraryPath(path);
       
       // 添加为新书库，并自动激活
-      const name = libraryName || `书库 ${libraries.length + 1}`;
+      // 如果用户没有输入名称，使用文件夹名作为书库名
+      const folderName = path.split(/[\\/]/).pop() || `书库 ${libraries.length + 1}`;
+      const name = libraryName.trim() || folderName;
       await addLibrary(name, path, true);  // autoActivate = true
       
       // 关闭modal
@@ -306,6 +308,7 @@ const SettingsPage: React.FC = () => {
               </Button>
             </Box>
           )}
+
         </Stack>
       </Box>
 
@@ -336,7 +339,7 @@ const SettingsPage: React.FC = () => {
           
           <TextInput
             label="书库名称 / Library Name"
-            placeholder="例如：科幻小说库 / e.g., Sci-Fi Library"
+            placeholder="留空则使用文件夹名字 / Leave empty to use folder name"
             value={libraryName}
             onChange={(e) => setLibraryName(e.currentTarget.value)}
             styles={{
@@ -479,6 +482,7 @@ const SettingsPage: React.FC = () => {
           </Stack>
         </Stack>
       </Modal>
+
     </Box>
   );
 };

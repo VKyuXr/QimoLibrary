@@ -1,8 +1,10 @@
 import 'virtual:uno.css'
 import '@mantine/core/styles.css';
+import '@mantine/notifications/styles.css';
 import './App.css';
 import ReactDOM from "react-dom/client";
 import { MantineProvider, ColorSchemeScript } from '@mantine/core';
+import { Notifications } from '@mantine/notifications';
 import App from "./App";
 import { theme } from './theme';
 import { BookProvider } from './context/BookContext';
@@ -69,6 +71,29 @@ const ThemedApp = () => {
   
   return (
     <MantineProvider theme={theme} forceColorScheme={settings.theme}>
+      <Notifications 
+        position="top-right"
+        styles={() => ({
+          notification: {
+            borderRadius: '0',
+            border: '1px solid var(--border-color)',
+            backgroundColor: 'var(--bg-primary)',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          },
+          title: {
+            fontFamily: 'Playfair Display, "Source Han Serif SC", serif',
+            color: 'var(--text-primary)',
+            fontSize: '16px',
+          },
+          description: {
+            color: 'var(--text-secondary)',
+            fontSize: '14px',
+          },
+          closeButton: {
+            color: 'var(--text-secondary)',
+          },
+        })}
+      />
       <BookProvider>
         <App />
         {showWelcome === true && <WelcomeModal onComplete={handleWelcomeComplete} />}

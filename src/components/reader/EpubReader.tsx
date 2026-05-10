@@ -160,6 +160,12 @@ const EpubReader: React.FC<EpubReaderProps> = ({ filePath }) => {
           console.error('Failed to load EPUB:', err);
           setError(err instanceof Error ? err.message : 'Failed to load EPUB');
           setLoading(false);
+          
+          // 如果加载失败，清除 localStorage 中的记录
+          if (filePath) {
+            console.warn('EPUB加载失败，清除记录:', filePath);
+            localStorage.removeItem('last-opened-book');
+          }
         }
       };
 

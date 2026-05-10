@@ -67,14 +67,9 @@ pub fn add_book_to_library(file_path: String, library_path: String) -> Result<Bo
         .to_string();
     
     println!("[Rust Debug] New book raw path: {}", absolute_path);
-    // 移除 Windows 长路径前缀 \\?\
-    let clean_path = if absolute_path.starts_with("\\\\?\\") {
-        let p = absolute_path[4..].to_string();
-        println!("[Rust Debug] New book cleaned path: {}", p);
-        p
-    } else {
-        absolute_path
-    };
+    // 使用统一的路径规范化工具
+    let clean_path = crate::utils::path_utils::normalize_windows_path(&absolute_path);
+    println!("[Rust Debug] New book cleaned path: {}", clean_path);
     
     // 提取EPUB元数据
     let epub_metadata = epub_parser::extract_epub_metadata(&source_path)
@@ -86,6 +81,7 @@ pub fn add_book_to_library(file_path: String, library_path: String) -> Result<Bo
                 publisher: None,
                 description: None,
                 cover_data: None,
+                is_notebook: false,
             }
         });
     
@@ -113,6 +109,7 @@ pub fn add_book_to_library(file_path: String, library_path: String) -> Result<Bo
         publisher: epub_metadata.publisher,
         added_time: now.clone(),
         file_path: Some(clean_path),
+        is_notebook: epub_metadata.is_notebook,
     };
     
     let metadata_json = serde_json::to_string_pretty(&metadata)
@@ -184,11 +181,9 @@ pub fn get_library_books(library_path: String) -> Result<Vec<BookMetadata>, Stri
                     if let Ok(absolute_path) = epub_file.canonicalize() {
                         let mut path_str = absolute_path.to_string_lossy().to_string();
                         println!("[Rust Debug] Raw canonical path: {}", path_str);
-                        // 移除 Windows 长路径前缀 \\?\
-                        if path_str.starts_with("\\\\?\\") {
-                            path_str = path_str[4..].to_string();
-                            println!("[Rust Debug] Cleaned path (removed \\\\?\\): {}", path_str);
-                        }
+                        // 使用统一的路径规范化工具
+                        path_str = crate::utils::path_utils::normalize_windows_path(&path_str);
+                        println!("[Rust Debug] Cleaned path: {}", path_str);
                         metadata.file_path = Some(path_str);
                         
                         // 保存更新后的元数据

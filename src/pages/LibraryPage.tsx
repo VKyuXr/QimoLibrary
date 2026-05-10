@@ -1,7 +1,8 @@
 import { Box, Title, Group, Stack, Card, Text, Button, ScrollArea, ActionIcon, Tooltip, Checkbox, Modal, TextInput, Textarea } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { useBook } from '../context/BookContext';
 import { useNavigate } from 'react-router-dom';
-import { IconDownload, IconTrash, IconEdit } from '@tabler/icons-react';
+import { IconDownload, IconTrash, IconEdit, IconNote } from '@tabler/icons-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useLibrary } from '../hooks/useLibrary';
 import { useEffect, useState } from 'react';
@@ -62,6 +63,9 @@ const BookItem: React.FC<BookItemProps> = ({
               }
             }}
           />
+          {book.is_notebook && (
+            <IconNote size={16} style={{ color: 'var(--accent-secondary)' }} />
+          )}
           <Text 
             lineClamp={1} 
             className="flex-1 mr-4" 
@@ -99,6 +103,10 @@ const LibraryPage: React.FC = () => {
   const [editAuthor, setEditAuthor] = useState('');
   const [editPublisher, setEditPublisher] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  
+  // 新建笔记Modal状态
+  const [createNotebookModalOpened, setCreateNotebookModalOpened] = useState(false);
+  const [newNotebookName, setNewNotebookName] = useState('');
 
   // 更新书库名称显示
   useEffect(() => {
@@ -117,16 +125,22 @@ const LibraryPage: React.FC = () => {
 
   const handleReadBook = () => {
     console.log('[Frontend Debug] Selected Book Object:', selectedBook);
-    // 注意：Rust 返回的是 file_path (蛇形命名)
+    // 后端已清理路径，直接使用
     if (selectedBook && selectedBook.file_path) {
-      let cleanPath = selectedBook.file_path;
-      if (cleanPath.startsWith("\\\\?\\")) {
-        cleanPath = cleanPath.substring(4);
-        console.log('[Frontend Debug] Path prefix removed in frontend');
-      }
+      const cleanPath = selectedBook.file_path;
       
-      console.log('[Frontend Debug] Navigating to reader with path:', cleanPath);
-      navigate(`/reader?filePath=${encodeURIComponent(cleanPath)}`);
+      // 根据是否为笔记决定跳转目标
+      if (selectedBook.is_notebook) {
+        console.log('[Frontend Debug] Navigating to notebook editor with path:', cleanPath);
+        navigate(`/notebook-editor?filePath=${encodeURIComponent(cleanPath)}`);
+        // 保存上次打开的笔记路径
+        localStorage.setItem('last-opened-notebook', cleanPath);
+      } else {
+        console.log('[Frontend Debug] Navigating to reader with path:', cleanPath);
+        navigate(`/reader?filePath=${encodeURIComponent(cleanPath)}`);
+        // 保存上次打开的书籍路径
+        localStorage.setItem('last-opened-book', cleanPath);
+      }
     } else {
       console.error('[Frontend Error] No file_path info in selected book. Keys:', Object.keys(selectedBook || {}));
     }
@@ -136,7 +150,11 @@ const LibraryPage: React.FC = () => {
     console.log('开始导入书籍...');
     
     if (!libraryPath) {
-      alert('请先在设置中配置书库位置');
+      notifications.show({
+        title: '提示',
+        message: '请先在设置中配置书库位置',
+        color: 'yellow',
+      });
       navigate('/settings');
       return;
     }
@@ -163,12 +181,70 @@ const LibraryPage: React.FC = () => {
         
         // 重新加载书籍列表
         await reloadBooks();
+        
+        notifications.show({
+          title: '成功',
+          message: `《${newBook.title}》已添加到书库`,
+          color: 'green',
+        });
       } else {
         console.log('用户取消了选择');
       }
     } catch (error) {
       console.error('导入书籍失败:', error);
-      alert('导入失败: ' + error);
+      notifications.show({
+        title: '导入失败',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
+  // 新建笔记
+  const handleCreateNotebook = async () => {
+    if (!libraryPath) {
+      notifications.show({
+        title: '提示',
+        message: '请先在设置中配置书库位置',
+        color: 'yellow',
+      });
+      navigate('/settings');
+      return;
+    }
+    
+    if (!newNotebookName.trim()) {
+      notifications.show({
+        title: '提示',
+        message: '请输入笔记名称',
+        color: 'yellow',
+      });
+      return;
+    }
+    
+    try {
+      const epubPath = await invoke<string>('create_notebook', {
+        libraryPath,
+        name: newNotebookName
+      });
+      
+      // 立即关闭Modal并清空输入
+      setCreateNotebookModalOpened(false);
+      setNewNotebookName('');
+      
+      // 直接刷新，无需延迟
+      await reloadBooks();
+      
+      console.log('笔记创建成功:', epubPath);
+      
+      // 跳转到笔记编辑器
+      navigate(`/notebook-editor?filePath=${encodeURIComponent(epubPath)}`);
+    } catch (error) {
+      console.error('创建笔记失败:', error);
+      notifications.show({
+        title: '创建失败',
+        message: String(error),
+        color: 'red',
+      });
     }
   };
 
@@ -226,10 +302,18 @@ const LibraryPage: React.FC = () => {
       // 刷新书籍列表
       await reloadBooks();
       
-      console.log('删除成功');
+      notifications.show({
+        title: '成功',
+        message: `已删除 ${idsToDelete.length} 本书籍`,
+        color: 'green',
+      });
     } catch (error) {
       console.error('删除书籍失败:', error);
-      alert('删除失败: ' + error);
+      notifications.show({
+        title: '删除失败',
+        message: String(error),
+        color: 'red',
+      });
     }
   };
 
@@ -275,10 +359,18 @@ const LibraryPage: React.FC = () => {
       // 刷新列表
       await reloadBooks();
       
-      console.log('元数据保存成功');
+      notifications.show({
+        title: '成功',
+        message: '元数据已更新',
+        color: 'green',
+      });
     } catch (error) {
       console.error('保存元数据失败:', error);
-      alert('保存失败: ' + error);
+      notifications.show({
+        title: '保存失败',
+        message: String(error),
+        color: 'red',
+      });
     }
   };
 
@@ -324,6 +416,20 @@ const LibraryPage: React.FC = () => {
                     }}
                   >
                     <IconDownload size={20} />
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="新建笔记">
+                  <ActionIcon
+                    size="lg"
+                    variant="outline"
+                    onClick={() => setCreateNotebookModalOpened(true)}
+                    style={{
+                      borderRadius: 0,
+                      borderColor: 'var(--accent-secondary)',
+                      color: 'var(--accent-secondary)'
+                    }}
+                  >
+                    <IconNote size={20} />
                   </ActionIcon>
                 </Tooltip>
               </Group>
@@ -477,7 +583,7 @@ const LibraryPage: React.FC = () => {
                       e.currentTarget.style.color = 'var(--text-primary)';
                     }}
                   >
-                    {t('startReading')}
+                    {selectedBook?.is_notebook ? t('openNotebook') : t('startReading')}
                   </Button>
                 </Stack>
               </Box>
@@ -496,8 +602,9 @@ const LibraryPage: React.FC = () => {
         onClose={() => setDeleteModalOpened(false)}
         title={<Text style={{ fontFamily: 'Playfair Display', color: 'var(--text-primary)' }}>确认删除 / Confirm Delete</Text>}
         centered
+        size="lg"
         styles={{
-          content: { borderRadius: 0, backgroundColor: 'var(--bg-primary)' },
+          content: { borderRadius: 0, backgroundColor: 'var(--bg-primary)', minWidth: '500px' },
           header: { borderBottom: '1px solid var(--border-color)' }
         }}
       >
@@ -599,6 +706,55 @@ const LibraryPage: React.FC = () => {
             />
           </Group>
         </Stack>
+      </Modal>
+      
+      {/* 新建笔记Modal */}
+      <Modal
+        opened={createNotebookModalOpened}
+        onClose={() => {
+          setCreateNotebookModalOpened(false);
+          setNewNotebookName('');
+        }}
+        title={<Text style={{ fontFamily: 'Playfair Display', color: 'var(--text-primary)' }}>新建笔记 / New Notebook</Text>}
+        centered
+        size="md"
+        styles={{
+          content: { borderRadius: 0, backgroundColor: 'var(--bg-primary)' },
+          header: { borderBottom: '1px solid var(--border-color)' }
+        }}
+      >
+        <TextInput
+          label="笔记名称 / Notebook Name"
+          placeholder="请输入笔记名称"
+          value={newNotebookName}
+          onChange={(e) => setNewNotebookName(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleCreateNotebook();
+            }
+          }}
+          autoFocus
+          styles={{
+            input: { borderRadius: 0, borderColor: 'var(--border-color)' },
+            label: { color: 'var(--text-primary)' }
+          }}
+        />
+        
+        <Group justify="flex-end" mt="md" gap="xl">
+          <SignatureButton 
+            text="取消 / Cancel"
+            onClick={() => {
+              setCreateNotebookModalOpened(false);
+              setNewNotebookName('');
+            }}
+            color="var(--text-secondary)"
+          />
+          <SignatureButton 
+            text="创建 / Create"
+            onClick={handleCreateNotebook}
+            color="var(--accent-secondary)"
+          />
+        </Group>
       </Modal>
     </Box>
   );

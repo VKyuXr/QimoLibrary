@@ -32,6 +32,17 @@ The font files in the `public/Fonts` directory of this project are subject to th
 - **License**: Free for commercial use (OFL or similar)
 - **Note**: Please refer to the original source for detailed license terms.
 
+## 7. LXGW WenKai (霞鹜文楷)
+- **Author**: LXGW (LXGW开源社区)
+- **License**: SIL Open Font License, Version 1.1
+- **Source**: https://github.com/lxgw/LxgwWenKai
+- **Description**: 基于日本 FONTWORKS 的 Klee One 字体开发的开源中文字体，适合正文阅读。
+
+## 8. Zhimang Xing (智芒行书)
+- **Author**: 智芒字库
+- **License**: Free for personal and commercial use
+- **Description**: 优美的中文行书字体，用于装饰性文本和标题设计。
+
 ---
 **注意**：本项目代码（Rust/React）采用 Apache License 2.0，但上述字体资源保留其原始授权。
 **Note**: The project code (Rust/React) is licensed under Apache License 2.0, but the above font resources retain their original licenses.

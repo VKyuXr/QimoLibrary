@@ -33,6 +33,7 @@ export const translations = {
     description: '简介',
     editMetadata: '编辑元数据',
     startReading: '开始阅读',
+    openNotebook: '打开笔记',
     bookTitle: '书名',
     enterTitle: '请输入书名',
     enterAuthor: '请输入作者',
@@ -54,6 +55,12 @@ export const translations = {
     loading: '加载中...',
     error: '错误',
     
+    // 笔记功能
+    notebooks: '笔记',
+    notebookEditor: '笔记编辑器',
+    preview: '预览',
+    noHeadings: '暂无标题',
+    
     // 设置页
     theme: '主题',
     themeSettings: '主题设置',
@@ -64,11 +71,13 @@ export const translations = {
     libraryLocationDesc: '选择用于存储所有书籍副本的文件夹位置',
     notSet: '未设置',
     selectLocation: '选择位置',
+    changeLocation: '更改位置',
     selectLibraryLocation: '选择书库位置',
     selectLibraryHint: '请选择一个文件夹作为书库,所有导入的书籍将存储在此处。',
     clickToSelect: '点击按钮选择文件夹',
     browse: '浏览',
     confirmSelection: '确认选择',
+
     
     // 语言
     language: '语言',
@@ -109,6 +118,7 @@ export const translations = {
     description: 'Description',
     editMetadata: 'Edit Metadata',
     startReading: 'Start Reading',
+    openNotebook: 'Open Notebook',
     bookTitle: 'Title',
     enterTitle: 'Enter book title',
     enterAuthor: 'Enter author name',
@@ -130,6 +140,12 @@ export const translations = {
     loading: 'Loading...',
     error: 'Error',
     
+    // Notebook
+    notebooks: 'Notebooks',
+    notebookEditor: 'Notebook Editor',
+    preview: 'Preview',
+    noHeadings: 'No headings',
+    
     // Settings
     theme: 'Theme',
     themeSettings: 'Theme Settings',
@@ -140,11 +156,13 @@ export const translations = {
     libraryLocationDesc: 'Choose folder to store all book copies',
     notSet: 'Not Set',
     selectLocation: 'Select Location',
+    changeLocation: 'Change Location',
     selectLibraryLocation: 'Select Library Location',
     selectLibraryHint: 'Please select a folder as library. All imported books will be stored here.',
     clickToSelect: 'Click to select folder',
     browse: 'Browse',
     confirmSelection: 'Confirm Selection',
+
     
     // Language
     language: 'Language',

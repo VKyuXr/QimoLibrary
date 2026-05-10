@@ -1,21 +1,61 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ActionIcon, Tooltip, Stack, Box } from '@mantine/core';
-import { IconHome, IconBooks, IconBook, IconSettings, IconX } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
+import { IconHome, IconBooks, IconBook, IconNote, IconSettings, IconX } from '@tabler/icons-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useTranslation } from '../hooks/useTranslation';
 import { useState } from 'react';
+import { useBook } from '../context/BookContext';
 
 const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
+  const { libraryPath } = useBook(); // 从 BookContext 获取书库路径
 
   const menuItems = [
     { id: 'home', icon: IconHome, labelZh: '主页', labelEn: 'Home', path: '/' },
     { id: 'library', icon: IconBooks, labelZh: '书库', labelEn: 'Library', path: '/library' },
+    { id: 'notebooks', icon: IconNote, labelZh: '笔记', labelEn: 'Notebooks', path: '/notebooks', special: true },
     { id: 'reader', icon: IconBook, labelZh: '阅读器', labelEn: 'Reader', path: '/reader' },
     { id: 'settings', icon: IconSettings, labelZh: '设置', labelEn: 'Settings', path: '/settings' },
   ];
+
+  // 处理笔记按钮点击
+  const handleNotebookClick = async () => {
+    try {
+      // 从 BookContext 获取书库路径
+      if (!libraryPath) {
+        notifications.show({
+          title: '提示',
+          message: '请先在设置中配置书库位置',
+          color: 'yellow',
+        });
+        navigate('/settings');
+        return;
+      }
+
+      // 检查当前是否已经在笔记编辑器页面
+      const currentPath = location.pathname;
+      const currentParams = new URLSearchParams(location.search);
+      const currentFilePath = currentParams.get('filePath');
+      
+      if (currentPath === '/notebook-editor' && currentFilePath) {
+        // 如果已经在笔记编辑器，不做任何操作（保持当前状态）
+        return;
+      }
+
+      // 否则跳转到笔记编辑器（不带参数，显示空状态）
+      navigate('/notebook-editor');
+    } catch (error) {
+      console.error('打开笔记失败:', error);
+      notifications.show({
+        title: '错误',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
 
   const handleClose = async () => {
     try {
@@ -59,8 +99,17 @@ const Sidebar: React.FC = () => {
         <Stack gap="md" className="w-full">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
             const [isHovered, setIsHovered] = useState(false);
+            
+            // 判断是否为激活状态
+            let isActive = false;
+            if (item.special) {
+              // 笔记按钮：当路由是 /notebook-editor 时激活
+              isActive = location.pathname === '/notebook-editor';
+            } else {
+              // 其他按钮：精确匹配路径
+              isActive = location.pathname === item.path;
+            }
             
             return (
               <Tooltip key={item.id} label={<span>{item.labelZh}<br/>{item.labelEn}</span>} position="right">
@@ -68,7 +117,7 @@ const Sidebar: React.FC = () => {
                   <ActionIcon
                     size="xl"
                     variant="subtle"
-                    onClick={() => navigate(item.path)}
+                    onClick={() => item.special ? handleNotebookClick() : navigate(item.path)}
                     onMouseEnter={() => setIsHovered(true)}
                     onMouseLeave={() => setIsHovered(false)}
                     style={{ 

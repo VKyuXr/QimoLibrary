@@ -5,9 +5,11 @@ use tauri::Manager;
 
 mod models;
 mod services;
+mod utils;
 
 use models::library::BookMetadata;
 use services::library_service;
+use services::notebook_service;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -28,6 +30,20 @@ async fn add_book_to_library(file_path: String, library_path: String) -> Result<
 #[tauri::command]
 async fn get_library_books(library_path: String) -> Result<Vec<BookMetadata>, String> {
     library_service::get_library_books(library_path)
+}
+
+#[tauri::command]
+async fn check_file_exists(path: String) -> Result<bool, String> {
+    use std::path::Path;
+    Ok(Path::new(&path).exists())
+}
+
+#[tauri::command]
+async fn get_file_size(path: String) -> Result<u64, String> {
+    use std::fs;
+    let metadata = fs::metadata(&path)
+        .map_err(|e| format!("获取文件元数据失败: {}", e))?;
+    Ok(metadata.len())
 }
 
 #[tauri::command]
@@ -237,6 +253,48 @@ async fn reset_first_launch(app_handle: tauri::AppHandle) -> Result<(), String> 
     Ok(())
 }
 
+// 笔记相关 Commands
+
+#[tauri::command]
+async fn create_notebook(library_path: String, name: String) -> Result<String, String> {
+    notebook_service::create_notebook(library_path, name)
+}
+
+#[tauri::command]
+async fn save_page_content(epub_path: String, markdown: String) -> Result<(), String> {
+    notebook_service::save_page_content(epub_path, markdown)
+}
+
+#[tauri::command]
+async fn get_page_content(epub_path: String) -> Result<String, String> {
+    notebook_service::get_page_content(epub_path)
+}
+
+#[tauri::command]
+async fn get_notebook_pages(epub_path: String) -> Result<Vec<crate::models::notebook::NotebookPage>, String> {
+    notebook_service::get_notebook_pages(epub_path)
+}
+
+#[tauri::command]
+async fn add_notebook_page(epub_path: String, title: String) -> Result<crate::models::notebook::NotebookPage, String> {
+    notebook_service::add_notebook_page(epub_path, title)
+}
+
+#[tauri::command]
+async fn get_page_content_by_id(epub_path: String, page_id: String) -> Result<String, String> {
+    notebook_service::get_page_content_by_id(epub_path, page_id)
+}
+
+#[tauri::command]
+async fn save_page_content_by_id(epub_path: String, page_id: String, markdown: String) -> Result<(), String> {
+    notebook_service::save_page_content_by_id(epub_path, page_id, markdown)
+}
+
+#[tauri::command]
+async fn delete_notebook_page_command(epub_path: String, page_id: String) -> Result<(), String> {
+    notebook_service::delete_notebook_page(epub_path, page_id)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -248,6 +306,7 @@ pub fn run() {
             initialize_library,
             add_book_to_library,
             get_library_books,
+            check_file_exists,
             set_library_path,
             get_library_path,
             delete_books_from_library,
@@ -258,7 +317,16 @@ pub fn run() {
             save_libraries_config,
             load_libraries_config,
             check_library_folder_status,
-            clear_folder
+            clear_folder,
+            create_notebook,
+            save_page_content,
+            get_page_content,
+            get_notebook_pages,
+            add_notebook_page,
+            get_page_content_by_id,
+            save_page_content_by_id,
+            delete_notebook_page_command,
+            get_file_size
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
