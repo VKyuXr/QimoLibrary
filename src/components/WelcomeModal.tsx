@@ -1,5 +1,5 @@
 import { Box, Stack, Text, Button, Group, Modal, TextInput } from '@mantine/core';
-import { IconBook, IconFolder, IconAlertTriangle } from '@tabler/icons-react';
+import { IconBook, IconFolder, IconAlertTriangle, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
@@ -30,7 +30,6 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ onComplete }) => {
         
         // 检查文件夹状态
         const status = await invoke<any>('check_library_folder_status', { libraryPath: pathStr });
-        console.log('文件夹状态:', status);
         
         if (status.is_empty) {
           // 空文件夹，直接使用
@@ -80,19 +79,24 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ onComplete }) => {
   };
 
   const handleClearAndUse = async () => {
-    // TODO: 实现清空文件夹的逻辑
-    // 目前先直接使用，后续可以添加清空功能
-    setSelectedPath(pendingPath);
-    setWarningModalOpened(false);
-    setPendingPath('');
+    if (!pendingPath) return;
     
-    // 显示提示
-    alert(
-      '⚠️ 注意\n\n' +
-      '该文件夹包含其他文件。\n' +
-      '建议选择一个空文件夹或专用的书库文件夹。\n\n' +
-      '已继续使用该文件夹。'
-    );
+    try {
+      console.log('清空文件夹:', pendingPath);
+      
+      // 调用后端清空文件夹
+      await invoke('clear_folder', { libraryPath: pendingPath });
+      console.log('文件夹已清空');
+      
+      // 关闭警告对话框
+      setWarningModalOpened(false);
+      setSelectedPath(pendingPath);
+      setPendingPath('');
+      
+    } catch (error) {
+      console.error('清空文件夹失败:', error);
+      alert(`清空文件夹失败: ${error}`);
+    }
   };
 
   return (
@@ -275,6 +279,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ onComplete }) => {
         }
         centered
         size="md"
+        zIndex={1100}
         styles={{
           content: { borderRadius: 0, backgroundColor: 'var(--bg-primary)' },
           header: { borderBottom: '1px solid var(--border-color)' }
@@ -282,59 +287,76 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ onComplete }) => {
       >
         <Stack gap="md">
           <Text size="sm" style={{ color: 'var(--text-primary)' }}>
-            该文件夹包含 {pendingPath && '文件'}，但不是奇墨书库。
+            选择的文件夹包含文件，但不是奇墨的书库。
             <br />
-            <span style={{ fontSize: '0.9em', color: 'var(--text-secondary)' }}>
-              This folder contains files but is not a Qimo library.
-            </span>
+            The selected folder contains files but is not a Qimo library.
           </Text>
-
+          
           <Box style={{
             padding: '12px',
-            backgroundColor: 'rgba(185, 141, 87, 0.1)',
+            backgroundColor: 'rgba(139, 58, 58, 0.1)',
             borderLeft: '3px solid var(--accent-secondary)'
           }}>
-            <Text size="sm" style={{ color: 'var(--text-primary)' }}>
-              ⚠️ 建议选择一个空文件夹或专用的书库文件夹，以避免与其他文件混淆。
-              <br />
-              <span style={{ fontSize: '0.9em' }}>
-                It's recommended to choose an empty folder or a dedicated library folder.
-              </span>
+            <Text size="xs" style={{ color: 'var(--text-secondary)', fontFamily: 'Courier Prime' }}>
+              {pendingPath}
             </Text>
           </Box>
-
-          <Group justify="space-between" mt="md">
-            <SignatureButton
-              text="取消 / Cancel"
+          
+          <Text size="sm" style={{ color: 'var(--text-secondary)' }}>
+            请选择以下操作之一：
+            <br />
+            Please choose one of the following actions:
+          </Text>
+          
+          <Stack gap="sm">
+            <Button
+              onClick={handleClearAndUse}
+              leftSection={<IconTrash size={16} />}
+              style={{
+                borderRadius: 0,
+                backgroundColor: 'transparent',
+                borderColor: 'var(--accent-secondary)',
+                borderWidth: '1px',
+                color: 'var(--accent-secondary)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--accent-secondary)';
+                e.currentTarget.style.color = 'var(--bg-primary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = 'var(--accent-secondary)';
+              }}
+            >
+              清空文件夹并创建书库 / Clear and Create Library
+            </Button>
+            
+            <Button
               onClick={() => {
                 setWarningModalOpened(false);
                 setPendingPath('');
               }}
-              color="var(--text-secondary)"
-            />
-            <Group gap="sm">
-              <Button
-                onClick={() => {
-                  setWarningModalOpened(false);
-                  setPendingPath('');
-                }}
-                style={{
-                  borderRadius: 0,
-                  backgroundColor: 'transparent',
-                  borderColor: 'var(--border-color)',
-                  borderWidth: '1px',
-                  color: 'var(--text-primary)'
-                }}
-              >
-                重新选择 / Choose Another
-              </Button>
-              <SignatureButton
-                text="继续使用该文件夹 / Use Anyway"
-                onClick={handleClearAndUse}
-                color="var(--accent-secondary)"
-              />
-            </Group>
-          </Group>
+              style={{
+                borderRadius: 0,
+                backgroundColor: 'transparent',
+                borderColor: 'var(--border-color)',
+                borderWidth: '1px',
+                color: 'var(--text-secondary)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--border-color)';
+                e.currentTarget.style.color = 'var(--text-primary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = 'var(--text-secondary)';
+              }}
+            >
+              取消 / Cancel
+            </Button>
+          </Stack>
         </Stack>
       </Modal>
     </Box>

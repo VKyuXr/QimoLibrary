@@ -2480,7 +2480,7 @@ dependencies = [
 
 [[package]]
 name = "qimo-library"
-version = "0.0.2"
+version = "0.2.2"
 dependencies = [
  "chrono",
  "pulldown-cmark",
