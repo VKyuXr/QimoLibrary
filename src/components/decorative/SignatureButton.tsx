@@ -5,12 +5,14 @@ interface SignatureButtonProps {
   text: string;
   onClick: () => void;
   color?: string;
+  disabled?: boolean;
 }
 
 const SignatureButton: React.FC<SignatureButtonProps> = ({ 
   text, 
   onClick, 
-  color = 'var(--text-primary)' 
+  color = 'var(--text-primary)',
+  disabled = false
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -51,22 +53,24 @@ const SignatureButton: React.FC<SignatureButtonProps> = ({
     ));
   };
 
+  const effectiveHover = isHovered && !disabled;
+
   return (
     <Box
       component="span"
-      onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
+      onClick={disabled ? undefined : onClick}
+      onMouseEnter={() => !disabled && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
         fontSize: '24px',
         lineHeight: '1.2',
-        color: color,
-        cursor: 'pointer',
+        color: disabled ? `${color}50` : color,
+        cursor: disabled ? 'not-allowed' : 'pointer',
         display: 'inline-block',
         padding: '8px 16px',
-        transform: isHovered ? 'scale(1.2)' : 'scale(1)',
+        transform: effectiveHover ? 'scale(1.2)' : 'scale(1)',
         transition: 'transform 0.2s ease',
-        transformOrigin: 'center center',  // 从中心缩放，保持位置稳定
+        transformOrigin: 'center center',
       }}
     >
       {renderText()}

@@ -9,6 +9,7 @@ import App from "./App";
 import { theme } from './theme';
 import { BookProvider } from './context/BookContext';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
+import { DatabaseProvider } from './hooks/useDatabase';
 import WelcomeModal from './components/WelcomeModal';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -94,10 +95,12 @@ const ThemedApp = () => {
           },
         })}
       />
-      <BookProvider>
-        <App />
-        {showWelcome === true && <WelcomeModal onComplete={handleWelcomeComplete} />}
-      </BookProvider>
+      <DatabaseProvider>
+        <BookProvider>
+          <App />
+          {showWelcome === true && <WelcomeModal onComplete={handleWelcomeComplete} />}
+        </BookProvider>
+      </DatabaseProvider>
     </MantineProvider>
   );
 };

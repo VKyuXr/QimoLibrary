@@ -6,10 +6,13 @@ use tauri::Manager;
 mod models;
 mod services;
 mod utils;
+mod db;
 
 use models::library::BookMetadata;
 use services::library_service;
 use services::notebook_service;
+use db::{BookRepository, TagRepository, AnnotationRepository, ReadingHistoryRepository};
+use db::models::{Book, Tag, Annotation, ReadingHistory};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -170,7 +173,7 @@ async fn clear_folder(library_path: String) -> Result<(), String> {
         }
     }
     
-    println!("已清空文件夹: {}", library_path);
+    println!("[INFO] Folder cleared: {}", library_path);
     Ok(())
 }
 
@@ -221,11 +224,11 @@ async fn is_first_launch(app_handle: tauri::AppHandle) -> Result<bool, String> {
     
     if !config_path.exists() {
         // 配置文件不存在，说明是首次启动
-        println!("首次启动：配置文件不存在");
+        println!("[INFO] First launch: config file not found");
         Ok(true)
     } else {
         // 配置文件存在，说明不是首次启动
-        println!("非首次启动：配置文件已存在");
+        println!("[INFO] Non-first launch: config file exists");
         Ok(false)
     }
 }
@@ -245,9 +248,9 @@ async fn reset_first_launch(app_handle: tauri::AppHandle) -> Result<(), String> 
     if config_path.exists() {
         fs::remove_file(&config_path)
             .map_err(|e| format!("删除配置文件失败: {}", e))?;
-        println!("已删除配置文件: {:?}", config_path);
+        println!("[INFO] Config file deleted: {:?}", config_path);
     } else {
-        println!("配置文件不存在，无需删除");
+        println!("[INFO] Config file not found, nothing to delete");
     }
     
     Ok(())
@@ -295,12 +298,123 @@ async fn delete_notebook_page_command(epub_path: String, page_id: String) -> Res
     notebook_service::delete_notebook_page(epub_path, page_id)
 }
 
+#[tauri::command]
+async fn init_db(app_handle: tauri::AppHandle) -> Result<(), String> {
+    db::init_database(&app_handle).map_err(|e| format!("初始化数据库失败: {}", e))
+}
+
+#[tauri::command]
+async fn ensure_db_initialized(app_handle: tauri::AppHandle) -> Result<(), String> {
+    // 这个命令确保数据库已初始化，如果还没有的话就初始化它
+    if db::get_database().is_err() {
+        db::init_database(&app_handle).map_err(|e| format!("初始化数据库失败: {}", e))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn sync_book_to_db(book_metadata: BookMetadata, library_path: String, folder_name: String) -> Result<(), String> {
+    let db = db::get_database().map_err(|e| format!("获取数据库失败: {}", e))?;
+    
+    let mut book: Book = book_metadata.into();
+    book.library_path = library_path;
+    book.folder_name = folder_name;
+    
+    BookRepository::create(db, &book).map_err(|e| format!("同步书籍到数据库失败: {}", e))
+}
+
+#[tauri::command]
+async fn get_books_from_db(library_path: String) -> Result<Vec<Book>, String> {
+    let db = db::get_database().map_err(|e| format!("获取数据库失败: {}", e))?;
+    BookRepository::find_by_library(db, &library_path).map_err(|e| format!("获取书籍失败: {}", e))
+}
+
+#[tauri::command]
+async fn search_books(query: String, library_path: Option<String>) -> Result<Vec<Book>, String> {
+    let db = db::get_database().map_err(|e| format!("获取数据库失败: {}", e))?;
+    BookRepository::search(db, &query, library_path.as_deref()).map_err(|e| format!("搜索书籍失败: {}", e))
+}
+
+#[tauri::command]
+async fn update_book_progress(book_id: String, progress: u32) -> Result<(), String> {
+    let db = db::get_database().map_err(|e| format!("获取数据库失败: {}", e))?;
+    
+    if let Some(mut book) = BookRepository::find_by_id(db, &book_id).map_err(|e| format!("查找书籍失败: {}", e))? {
+        book.progress = progress;
+        book.last_read_time = Some(chrono::Utc::now().to_rfc3339());
+        BookRepository::update(db, &book).map_err(|e| format!("更新书籍失败: {}", e))?;
+        
+        let history = ReadingHistory::new(book_id, progress);
+        ReadingHistoryRepository::create(db, &history).map_err(|e| format!("记录阅读历史失败: {}", e))?;
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+async fn add_tag_to_book(book_id: String, tag_name: String) -> Result<(), String> {
+    let db = db::get_database().map_err(|e| format!("获取数据库失败: {}", e))?;
+    BookRepository::add_tag(db, &book_id, &tag_name).map_err(|e| format!("添加标签失败: {}", e))
+}
+
+#[tauri::command]
+async fn remove_tag_from_book(book_id: String, tag_name: String) -> Result<(), String> {
+    let db = db::get_database().map_err(|e| format!("获取数据库失败: {}", e))?;
+    BookRepository::remove_tag(db, &book_id, &tag_name).map_err(|e| format!("移除标签失败: {}", e))
+}
+
+#[tauri::command]
+async fn get_all_tags() -> Result<Vec<Tag>, String> {
+    let db = db::get_database().map_err(|e| format!("获取数据库失败: {}", e))?;
+    TagRepository::find_all(db).map_err(|e| format!("获取标签失败: {}", e))
+}
+
+#[tauri::command]
+async fn create_annotation(book_id: String, cfi: String, text: String, note: Option<String>, color: Option<String>) -> Result<Annotation, String> {
+    let db = db::get_database().map_err(|e| format!("获取数据库失败: {}", e))?;
+    
+    let mut annotation = Annotation::new(book_id, cfi, text);
+    annotation.note = note;
+    if let Some(c) = color {
+        annotation.color = c;
+    }
+    
+    AnnotationRepository::create(db, &annotation).map_err(|e| format!("创建标注失败: {}", e))?;
+    Ok(annotation)
+}
+
+#[tauri::command]
+async fn get_book_annotations(book_id: String) -> Result<Vec<Annotation>, String> {
+    let db = db::get_database().map_err(|e| format!("获取数据库失败: {}", e))?;
+    AnnotationRepository::find_by_book(db, &book_id).map_err(|e| format!("获取标注失败: {}", e))
+}
+
+#[tauri::command]
+async fn delete_annotation(annotation_id: String) -> Result<(), String> {
+    let db = db::get_database().map_err(|e| format!("获取数据库失败: {}", e))?;
+    AnnotationRepository::delete(db, &annotation_id).map_err(|e| format!("删除标注失败: {}", e))
+}
+
+#[tauri::command]
+async fn get_recent_reading(limit: i32) -> Result<Vec<ReadingHistory>, String> {
+    let db = db::get_database().map_err(|e| format!("获取数据库失败: {}", e))?;
+    ReadingHistoryRepository::find_recent(db, limit).map_err(|e| format!("获取阅读历史失败: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .setup(|app| {
+            let app_handle = app.handle();
+            match db::init_database(&app_handle) {
+                Ok(_) => println!("[INFO] Database initialized successfully"),
+                Err(e) => println!("[ERROR] Database initialization failed: {}", e),
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             initialize_library,
@@ -326,7 +440,19 @@ pub fn run() {
             get_page_content_by_id,
             save_page_content_by_id,
             delete_notebook_page_command,
-            get_file_size
+            get_file_size,
+            init_db,
+            sync_book_to_db,
+            get_books_from_db,
+            search_books,
+            update_book_progress,
+            add_tag_to_book,
+            remove_tag_from_book,
+            get_all_tags,
+            create_annotation,
+            get_book_annotations,
+            delete_annotation,
+            get_recent_reading
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

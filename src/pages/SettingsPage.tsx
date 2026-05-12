@@ -356,41 +356,42 @@ const SettingsPage: React.FC = () => {
             label="书库路径 / Library Path"
             value={selectedPath}
             readOnly
-            placeholder="点击按钮选择文件夹 / Click to select folder"
-            rightSection={<IconFolder size={18} />}
+            placeholder="点击右侧按钮选择文件夹"
+            rightSection={
+              <ActionIcon
+                variant="subtle"
+                onClick={handleSelectLibraryPath}
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <IconFolder size={18} />
+              </ActionIcon>
+            }
+            onClick={handleSelectLibraryPath}
             styles={{
               input: { 
                 borderRadius: 0, 
                 borderColor: 'var(--border-color)',
                 fontFamily: 'Courier Prime',
-                color: 'var(--text-primary)'
+                color: 'var(--text-primary)',
+                cursor: 'pointer'
               },
               label: { color: 'var(--text-primary)' }
             }}
           />
           
-          <Group justify="space-between" mt="md">
+          <Group justify="flex-end" mt="md" gap="md" style={{ paddingRight: '20px' }}>
             <SignatureButton 
               text="取消 / Cancel"
               onClick={() => setModalOpened(false)}
               color="var(--text-secondary)"
             />
             <SignatureButton 
-              text="浏览 / Browse"
-              onClick={handleSelectLibraryPath}
+              text="确认 / Confirm"
+              onClick={handleConfirmLibraryPath}
               color="var(--accent-secondary)"
+              disabled={!selectedPath}
             />
           </Group>
-          
-          {selectedPath && (
-            <Group justify="flex-end" mt="md">
-              <SignatureButton 
-                text="确认 / Confirm"
-                onClick={handleConfirmLibraryPath}
-                color="var(--accent-secondary)"
-              />
-            </Group>
-          )}
         </Stack>
       </Modal>
       

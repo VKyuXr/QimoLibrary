@@ -296,7 +296,7 @@ fn find_cover_via_meta(content: &str) -> Option<String> {
             }
             Ok(Event::Eof) => break,
             Err(e) => {
-                eprintln!("[Warning] XML解析错误: {}", e);
+                println!("[WARN] XML parsing error: {}", e);
                 break;
             }
             _ => {}

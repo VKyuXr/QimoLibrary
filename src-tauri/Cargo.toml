@@ -1,6 +1,6 @@
 [package]
 name = "qimo-library"
-version = "0.2.2"  # 版本号与 package.json 保持一致
+version = "0.2.3"  # 版本号与 package.json 保持一致
 description = "EPUB Library Manager"
 authors = ["you"]
 edition = "2021"
@@ -29,6 +29,9 @@ uuid = { version = "1", features = ["v4", "serde"] }
 zip = "0.6"
 quick-xml = { version = "0.36", features = ["serialize"] }
 pulldown-cmark = "0.9"
+rusqlite = { version = "0.31", features = ["bundled", "chrono", "serde_json", "uuid"] }
+once_cell = "1.19"
+thiserror = "1.0"
 
 # 优化配置 - 减小构建体积
 [profile.dev]
@@ -43,4 +46,3 @@ strip = true           # 剥离调试符号
 lto = true             # 链接时优化,减小体积
 panic = "abort"        # panic时直接终止,减小体积
 codegen-units = 1      # 单个代码生成单元,更好优化
-

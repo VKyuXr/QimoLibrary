@@ -13,6 +13,8 @@ pub struct BookMetadata {
     pub added_time: String,
     pub file_path: Option<String>, // 存储 EPUB 文件的相对或绝对路径
     pub is_notebook: bool, // 是否为笔记
+    #[serde(default)]
+    pub tags: Vec<String>, // 书籍标签
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

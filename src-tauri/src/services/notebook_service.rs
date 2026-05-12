@@ -572,7 +572,7 @@ pub fn get_notebook_pages(epub_path: String) -> Result<Vec<crate::models::notebo
     Ok(pages)
         }
         Err(e) => {
-            eprintln!("[ERROR] get_notebook_pages: 读取OPF失败: {}", e);
+            println!("[ERROR] Failed to get notebook pages: failed to read OPF: {}", e);
             Err(format!("读取OPF失败: {}", e))
         }
     }
@@ -1004,8 +1004,8 @@ fn repackage_epub(notebook_folder: &PathBuf, epub_path: &str) -> Result<(), Stri
     use std::fs::File;
     use zip::{ZipWriter, CompressionMethod};
     
-    eprintln!("[DEBUG] 开始打包EPUB: {}", epub_path);
-    eprintln!("[DEBUG] 笔记文件夹: {:?}", notebook_folder);
+    println!("[DEBUG] Starting EPUB repackaging: {}", epub_path);
+    println!("[DEBUG] Notebook folder: {:?}", notebook_folder);
     
     let temp_epub_path = format!("{}.tmp", epub_path);
     let file = File::create(&temp_epub_path)
@@ -1037,17 +1037,17 @@ fn repackage_epub(notebook_folder: &PathBuf, epub_path: &str) -> Result<(), Stri
         .map_err(|e| format!("写入container.xml失败: {}", e))?;
     
     // 递归添加文件夹中的所有文件
-    eprintln!("[DEBUG] 开始添加文件夹内容...");
+    println!("[DEBUG] Adding folder contents to ZIP...");
     add_folder_to_zip(&mut zip, notebook_folder, "", &options)?;
-    eprintln!("[DEBUG] 文件夹内容添加完成");
+    println!("[DEBUG] Folder contents added to ZIP");
     
     zip.finish().map_err(|e| format!("完成ZIP写入失败: {}", e))?;
-    eprintln!("[DEBUG] ZIP写入完成");
+    println!("[DEBUG] ZIP writing completed");
     
     // 替换原EPUB文件
     fs::rename(&temp_epub_path, epub_path)
         .map_err(|e| format!("替换EPUB文件失败: {}", e))?;
-    eprintln!("[DEBUG] EPUB打包完成: {}", epub_path);
+    println!("[DEBUG] EPUB repackaging completed: {}", epub_path);
     
     Ok(())
 }
@@ -1152,6 +1152,7 @@ fn register_notebook_to_library(epub_path: &str, library_path: &str, title: &str
         added_time: now,
         file_path: Some(epub_path.to_string()),
         is_notebook: true,  // 标记为笔记
+        tags: Vec::new(),
     };
     
     let metadata_path = PathBuf::from(library_path)

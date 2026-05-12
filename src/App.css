@@ -170,6 +170,11 @@ body {
   transform: scale(1.05);
 }
 
+/* ActionIcon 悬停效果 */
+.hover-opacity:hover {
+  opacity: 0.7;
+}
+
 /* Markdown 渲染样式 */
 .markdown-body {
   color: var(--text-primary);

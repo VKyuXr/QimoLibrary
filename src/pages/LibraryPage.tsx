@@ -1,14 +1,15 @@
-import { Box, Title, Group, Stack, Card, Text, Button, ScrollArea, ActionIcon, Tooltip, Checkbox, Modal, TextInput, Textarea } from '@mantine/core';
+import { Box, Title, Group, Stack, Card, Text, Button, ScrollArea, ActionIcon, Tooltip, Checkbox, Modal, TextInput, Textarea, Badge } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useBook } from '../context/BookContext';
 import { useNavigate } from 'react-router-dom';
-import { IconDownload, IconTrash, IconEdit, IconNote } from '@tabler/icons-react';
+import { IconDownload, IconTrash, IconEdit, IconNote, IconX, IconPlus } from '@tabler/icons-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useLibrary } from '../hooks/useLibrary';
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from '../hooks/useTranslation';
 import SignatureButton from '../components/decorative/SignatureButton';
+import { useDatabase } from '../hooks/useDatabase';
 
 // 书籍列表项组件 - 用于避免在map中使用Hooks
 interface BookItemProps {
@@ -48,7 +49,9 @@ const BookItem: React.FC<BookItemProps> = ({
               e.stopPropagation();
               onCheckboxChange(book.id, e.currentTarget.checked);
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
             styles={{
               input: { 
                 borderRadius: 0,
@@ -87,8 +90,9 @@ const BookItem: React.FC<BookItemProps> = ({
 };
 
 const LibraryPage: React.FC = () => {
-  const { books, selectedBook, selectBook, libraryPath, refreshBooks, removeBook } = useBook();
+  const { books, selectedBook, selectBook, setSelectedBook, setBooks, libraryPath, refreshBooks, removeBook } = useBook();
   const { addBookToLibrary } = useLibrary();
+  const { addTag, removeTag, loadTags, tags } = useDatabase();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [libraryName, setLibraryName] = useState<string>('');
@@ -103,6 +107,15 @@ const LibraryPage: React.FC = () => {
   const [editAuthor, setEditAuthor] = useState('');
   const [editPublisher, setEditPublisher] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  
+  // 标签管理相关状态
+  const [tagModalOpened, setTagModalOpened] = useState(false);
+  const [newTag, setNewTag] = useState('');
+  const [bookTags, setBookTags] = useState<string[]>([]);
+  
+  // 搜索相关状态
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredBooks, setFilteredBooks] = useState<typeof books>([]);
   
   // 新建笔记Modal状态
   const [createNotebookModalOpened, setCreateNotebookModalOpened] = useState(false);
@@ -160,33 +173,56 @@ const LibraryPage: React.FC = () => {
     }
     
     try {
-      // 打开文件选择对话框，只允许选择 .epub 文件
       const selected = await open({
-        multiple: false,
+        multiple: true,
         filters: [{
           name: 'EPUB Files',
           extensions: ['epub']
         }]
       });
 
-      console.log('选择的文件:', selected);
-
       if (selected) {
-        const pathStr = selected.toString();
-        console.log('添加书籍到库:', pathStr, '库路径:', libraryPath);
+        const files = Array.isArray(selected) ? selected : [selected];
+        let successCount = 0;
+        let failCount = 0;
+        const failedFiles: string[] = [];
+
+        for (const file of files) {
+          try {
+            const pathStr = file.toString();
+            console.log('添加书籍到库:', pathStr, '库路径:', libraryPath);
+            
+            const newBook = await addBookToLibrary(pathStr, libraryPath);
+            console.log('书籍添加成功:', newBook);
+            successCount++;
+          } catch (error) {
+            failCount++;
+            failedFiles.push(file.toString().split(/[/\\]/).pop() || '未知文件');
+            console.error('导入失败:', file, error);
+          }
+        }
         
-        // 调用Rust命令添加书籍
-        const newBook = await addBookToLibrary(pathStr, libraryPath);
-        console.log('书籍添加成功:', newBook);
-        
-        // 重新加载书籍列表
         await reloadBooks();
         
-        notifications.show({
-          title: '成功',
-          message: `《${newBook.title}》已添加到书库`,
-          color: 'green',
-        });
+        if (failCount === 0) {
+          notifications.show({
+            title: '成功',
+            message: `已成功导入 ${successCount} 本书籍`,
+            color: 'green',
+          });
+        } else if (successCount === 0) {
+          notifications.show({
+            title: '导入失败',
+            message: `所有书籍导入失败`,
+            color: 'red',
+          });
+        } else {
+          notifications.show({
+            title: '部分成功',
+            message: `成功导入 ${successCount} 本，失败 ${failCount} 本`,
+            color: 'yellow',
+          });
+        }
       } else {
         console.log('用户取消了选择');
       }
@@ -259,15 +295,6 @@ const LibraryPage: React.FC = () => {
     setSelectedIds(newSelected);
   };
 
-  // 全选/取消全选
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds(new Set(books.map(book => book.id)));
-    } else {
-      setSelectedIds(new Set());
-    }
-  };
-
   // 打开删除确认对话框
   const handleOpenDeleteModal = () => {
     if (selectedIds.size === 0) {
@@ -323,12 +350,218 @@ const LibraryPage: React.FC = () => {
       return;
     }
     
-    // 填充当前值
     setEditTitle(selectedBook.title);
     setEditAuthor(selectedBook.author);
     setEditPublisher(selectedBook.publisher || '');
     setEditDescription(selectedBook.description || '');
     setEditModalOpened(true);
+  };
+
+  // 打开标签管理Modal
+  const handleOpenTagModal = async () => {
+    if (!selectedBook) {
+      return;
+    }
+    
+    await loadTags();
+    // 确保读取正确的 tags（从 selectedBook 或 books 列表）
+    const currentBook = books.find(b => b.id === selectedBook.id);
+    const currentTags = (currentBook as any)?.tags || (selectedBook as any).tags || [];
+    setBookTags(currentTags);
+    setTagModalOpened(true);
+  };
+
+  // 直接添加标签（用于标签库点击添加，不清空输入框）
+  const handleAddTagDirectly = async (tagName: string) => {
+    if (!selectedBook) {
+      return;
+    }
+    
+    if (!tagName) {
+      return;
+    }
+    
+    try {
+      await addTag(selectedBook.id, tagName);
+      
+      // 直接更新 books 列表中的对应书籍
+      setBooks(prevBooks => 
+        prevBooks.map(book => 
+          book.id === selectedBook.id 
+            ? { ...book, tags: [...((book as any).tags || []), tagName] }
+            : book
+        )
+      );
+      
+      // 更新 selectedBook
+      const updatedTags = [...((selectedBook as any).tags || []), tagName];
+      const updatedBook = { ...selectedBook, tags: updatedTags };
+      setSelectedBook(updatedBook as any);
+      
+      // 同时更新 bookTags 状态
+      setBookTags(updatedTags);
+      
+      // 刷新标签库
+      await loadTags();
+      
+      notifications.show({
+        title: '成功',
+        message: `已添加标签: ${tagName}`,
+        color: 'green',
+      });
+    } catch (error) {
+      notifications.show({
+        title: '添加失败',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+  
+  // 添加标签
+  const handleAddTag = async (tagName?: string) => {
+    if (!selectedBook) {
+      return;
+    }
+    
+    const nameToAdd = tagName || newTag.trim();
+    if (!nameToAdd) {
+      return;
+    }
+    
+    try {
+      await addTag(selectedBook.id, nameToAdd);
+      
+      // 直接更新 books 列表中的对应书籍
+      setBooks(prevBooks => 
+        prevBooks.map(book => 
+          book.id === selectedBook.id 
+            ? { ...book, tags: [...((book as any).tags || []), nameToAdd] }
+            : book
+        )
+      );
+      
+      // 更新 selectedBook
+      const updatedTags = [...((selectedBook as any).tags || []), nameToAdd];
+      const updatedBook = { ...selectedBook, tags: updatedTags };
+      setSelectedBook(updatedBook as any);
+      
+      // 同时更新 bookTags 状态
+      setBookTags(updatedTags);
+      
+      // 清空输入框（仅当使用输入框添加时）
+      if (!tagName) {
+        setNewTag('');
+      }
+      
+      // 刷新标签库
+      await loadTags();
+      
+      notifications.show({
+        title: '成功',
+        message: `已添加标签: ${nameToAdd}`,
+        color: 'green',
+      });
+    } catch (error) {
+      notifications.show({
+        title: '添加失败',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
+  // 删除标签
+  const handleRemoveTag = async (tagName: string) => {
+    if (!selectedBook) {
+      return;
+    }
+    
+    try {
+      await removeTag(selectedBook.id, tagName);
+      
+      // 直接更新 books 列表中的对应书籍
+      setBooks(prevBooks => 
+        prevBooks.map(book => 
+          book.id === selectedBook.id 
+            ? { ...book, tags: ((book as any).tags || []).filter((t: string) => t !== tagName) }
+            : book
+        )
+      );
+      
+      // 更新 selectedBook
+      const updatedTags = ((selectedBook as any).tags || []).filter((t: string) => t !== tagName);
+      const updatedBook = { ...selectedBook, tags: updatedTags };
+      setSelectedBook(updatedBook as any);
+      
+      // 同时更新 bookTags 状态
+      setBookTags(updatedTags);
+      
+      // 刷新标签库
+      await loadTags();
+      
+      notifications.show({
+        title: '成功',
+        message: `已移除标签: ${tagName}`,
+        color: 'green',
+      });
+    } catch (error) {
+      notifications.show({
+        title: '移除失败',
+        message: String(error),
+        color: 'red',
+      });
+    }
+  };
+
+  // 高级搜索函数
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    
+    if (!query.trim()) {
+      setFilteredBooks([]);
+      return;
+    }
+
+    const lowerQuery = query.toLowerCase();
+    let results = books;
+
+    // 解析搜索查询
+    const nameMatch = lowerQuery.match(/name:(\S+)/);
+    const authorMatch = lowerQuery.match(/author:(\S+)/);
+    const tagMatch = lowerQuery.match(/tag:(\S+)/);
+
+    if (nameMatch) {
+      const name = nameMatch[1];
+      results = results.filter(book => 
+        book.title.toLowerCase().includes(name)
+      );
+    }
+
+    if (authorMatch) {
+      const author = authorMatch[1];
+      results = results.filter(book => 
+        book.author.toLowerCase().includes(author)
+      );
+    }
+
+    if (tagMatch) {
+      const tag = tagMatch[1];
+      results = results.filter(book => 
+        (book as any).tags?.some((t: string) => t.toLowerCase().includes(tag))
+      );
+    }
+
+    // 如果没有前缀匹配，执行普通搜索
+    if (!nameMatch && !authorMatch && !tagMatch) {
+      results = results.filter(book => 
+        book.title.toLowerCase().includes(lowerQuery) ||
+        book.author.toLowerCase().includes(lowerQuery) ||
+        (book as any).tags?.some((t: string) => t.toLowerCase().includes(lowerQuery))
+      );
+    }
+
+    setFilteredBooks(results);
   };
 
   // 保存元数据
@@ -385,7 +618,7 @@ const LibraryPage: React.FC = () => {
             borderWidth: '1px',
             padding: '16px'
           }}>
-            <Group justify="space-between">
+            <Group justify="space-between" align="flex-start">
               <Title order={3} style={{ fontFamily: 'Playfair Display', color: 'var(--text-primary)' }}>{libraryName}</Title>
               <Group gap="xs">
                 {selectedIds.size > 0 && (
@@ -438,32 +671,87 @@ const LibraryPage: React.FC = () => {
         </Box>
         
         <ScrollArea className="flex-1">
-          {books.length > 0 ? (
-            <Box className="py-4">
-              {/* 全选复选框 */}
-              <Box className="mb-2 px-2" style={{ borderBottom: '1px dashed var(--border-color)', paddingBottom: '8px' }}>
-                <Checkbox
-                  checked={selectedIds.size === books.length && books.length > 0}
-                  indeterminate={selectedIds.size > 0 && selectedIds.size < books.length}
-                  onChange={(e) => handleSelectAll(e.currentTarget.checked)}
-                  label={`全选 (${selectedIds.size}/${books.length})`}
-                  styles={{
-                    input: {
-                      borderRadius: 0,
-                      borderColor: 'var(--border-color)',
-                      '&:checked': {
-                        backgroundColor: 'var(--accent-secondary)',
-                        borderColor: 'var(--accent-secondary)'
+          {/* 搜索框和全选 - 始终显示 */}
+          <Box className="px-2 py-2" style={{ borderBottom: '1px dashed var(--border-color)' }}>
+            <Group justify="space-between" wrap="nowrap">
+{(() => {
+                const currentBooks = filteredBooks.length > 0 ? filteredBooks : books;
+                const allSelected = currentBooks.length > 0 && currentBooks.every(book => selectedIds.has(book.id));
+                const selectedCount = currentBooks.filter(book => selectedIds.has(book.id)).length;
+                const isIndeterminate = selectedCount > 0 && selectedCount < currentBooks.length;
+                return (
+                  <Checkbox
+                    checked={allSelected}
+                    indeterminate={isIndeterminate}
+                    onChange={(e) => {
+                      if (e.currentTarget.checked) {
+                        // 选择当前显示的所有书籍
+                        const newSelected = new Set(selectedIds);
+                        currentBooks.forEach(book => newSelected.add(book.id));
+                        setSelectedIds(newSelected);
+                      } else {
+                        // 取消选择当前显示的所有书籍
+                        const newSelected = new Set(selectedIds);
+                        currentBooks.forEach(book => newSelected.delete(book.id));
+                        setSelectedIds(newSelected);
                       }
-                    },
-                    label: {
-                      color: 'var(--text-primary)'
-                    }
-                  }}
-                />
-              </Box>
-              
-              {books.map((book) => (
+                    }}
+                    label={`全选 (${selectedIds.size}/${currentBooks.length})`}
+                    styles={{
+                      input: {
+                        borderRadius: 0,
+                        borderColor: 'var(--border-color)',
+                        '&:checked': {
+                          backgroundColor: 'var(--accent-secondary)',
+                          borderColor: 'var(--accent-secondary)'
+                        }
+                      },
+                      label: {
+                        color: 'var(--text-primary)'
+                      }
+                    }}
+                  />
+                );
+              })()}
+              <TextInput
+                placeholder="搜索 (name:/author:/tag:)"
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.currentTarget.value)}
+                size="xs"
+                style={{ width: 200 }}
+                rightSection={
+                  searchQuery ? (
+                    <ActionIcon
+                      size="xs"
+                      variant="subtle"
+                      onClick={() => handleSearch('')}
+                    >
+                      <IconX size={12} />
+                    </ActionIcon>
+                  ) : null
+                }
+                styles={{
+                  input: {
+                    borderRadius: 0,
+                    borderColor: 'var(--border-color)',
+                    backgroundColor: 'var(--bg-secondary)',
+                  }
+                }}
+              />
+            </Group>
+            {searchQuery && (
+              <Text size="xs" mt="xs" style={{ color: 'var(--text-secondary)' }}>
+                {filteredBooks.length > 0 
+                  ? `找到 ${filteredBooks.length} 本匹配的书籍`
+                  : '未找到匹配的书籍'}
+              </Text>
+            )}
+          </Box>
+          
+          {/* 书籍列表 */}
+          {(searchQuery ? filteredBooks : books).length > 0 ? (
+            <Box className="py-4">
+              {(searchQuery ? filteredBooks : books).map((book) => (
                 <BookItem
                   key={book.id}
                   book={book}
@@ -476,8 +764,14 @@ const LibraryPage: React.FC = () => {
             </Box>
           ) : (
             <Box className="text-center py-8">
-              <Text size="sm" style={{ color: 'var(--text-secondary)' }}>暂无书籍</Text>
-              <Text size="xs" mt={4} style={{ color: 'var(--text-secondary)' }}>点击下方按钮导入 EPUB 文件</Text>
+              <Text size="sm" style={{ color: 'var(--text-secondary)' }}>
+                {searchQuery ? '未找到匹配的书籍' : '暂无书籍'}
+              </Text>
+              {!searchQuery && (
+                <>
+                  <Text size="xs" mt={4} style={{ color: 'var(--text-secondary)' }}>点击下方按钮导入 EPUB 文件</Text>
+                </>
+              )}
             </Box>
           )}
         </ScrollArea>
@@ -528,6 +822,46 @@ const LibraryPage: React.FC = () => {
                       <Text fw={500} style={{ color: 'var(--text-primary)' }}>{selectedBook.publisher}</Text>
                     </Box>
                   )}
+
+                  {/* 标签显示 */}
+                  <Box>
+                    <Group justify="space-between" mb="xs">
+                      <Text size="sm" style={{ color: 'var(--text-secondary)' }}>标签</Text>
+                      <ActionIcon
+                        size="sm"
+                        variant="subtle"
+                        onClick={handleOpenTagModal}
+                        style={{
+                          color: 'var(--text-secondary)',
+                          transition: 'all 0.2s ease',
+                        }}
+                        className="hover-opacity"
+                      >
+                        <IconPlus size={14} />
+                      </ActionIcon>
+                    </Group>
+                    {(selectedBook as any).tags && (selectedBook as any).tags.length > 0 ? (
+                      <Group gap="xs">
+                        {(selectedBook as any).tags.map((tag: string) => (
+                          <Badge
+                            key={tag}
+                            size="sm"
+                            style={{
+                              backgroundColor: 'var(--bg-secondary)',
+                              color: 'var(--accent-color)',
+                              borderRadius: 0,
+                              cursor: 'pointer'
+                            }}
+                            onClick={() => handleRemoveTag(tag)}
+                          >
+                            #{tag}
+                          </Badge>
+                        ))}
+                      </Group>
+                    ) : (
+                      <Text size="xs" style={{ color: 'var(--text-secondary)' }}>暂无标签</Text>
+                    )}
+                  </Box>
 
                   {/* 简介 */}
                   {selectedBook.description && (
@@ -616,7 +950,7 @@ const LibraryPage: React.FC = () => {
               Are you sure you want to delete {selectedIds.size} selected book(s)? This action cannot be undone.
             </span>
           </Text>
-          <Group justify="flex-end" mt="md" gap="xl" style={{ paddingRight: '20px' }}>
+          <Group justify="flex-end" mt="md" gap="md" style={{ paddingRight: '20px' }}>
             <SignatureButton 
               text="取消 / Cancel"
               onClick={() => setDeleteModalOpened(false)}
@@ -693,7 +1027,7 @@ const LibraryPage: React.FC = () => {
             }}
           />
           
-          <Group justify="flex-end" mt="md" gap="xl">
+          <Group justify="flex-end" mt="md" gap="md" style={{ paddingRight: '20px' }}>
             <SignatureButton 
               text="取消 / Cancel"
               onClick={() => setEditModalOpened(false)}
@@ -740,7 +1074,7 @@ const LibraryPage: React.FC = () => {
           }}
         />
         
-        <Group justify="flex-end" mt="md" gap="xl">
+        <Group justify="flex-end" mt="md" gap="md" style={{ paddingRight: '20px' }}>
           <SignatureButton 
             text="取消 / Cancel"
             onClick={() => {
@@ -755,6 +1089,145 @@ const LibraryPage: React.FC = () => {
             color="var(--accent-secondary)"
           />
         </Group>
+      </Modal>
+
+      {/* 标签管理Modal */}
+      <Modal
+        opened={tagModalOpened}
+        onClose={() => setTagModalOpened(false)}
+        title={<Text style={{ fontFamily: 'Playfair Display', color: 'var(--text-primary)' }}>管理标签 / Manage Tags</Text>}
+        centered
+        size="md"
+        styles={{
+          content: { borderRadius: 0, backgroundColor: 'var(--bg-primary)' },
+          header: { borderBottom: '1px solid var(--border-color)' }
+        }}
+      >
+        <Stack gap="lg">
+          {/* 当前标签 */}
+          <Box>
+            <Text size="sm" mb="xs" style={{ color: 'var(--text-secondary)' }}>
+              当前标签 ({bookTags.length})
+            </Text>
+            {bookTags.length > 0 ? (
+              <Group gap="xs">
+                {bookTags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    size="lg"
+                    style={{
+                      backgroundColor: 'var(--accent-secondary)',
+                      color: 'var(--bg-primary)',
+                      borderRadius: 0,
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => handleRemoveTag(tag)}
+                  >
+                    #{tag}
+                  </Badge>
+                ))}
+              </Group>
+            ) : (
+              <Text size="sm" style={{ color: 'var(--text-secondary)' }}>
+                暂无标签
+              </Text>
+            )}
+          </Box>
+          
+          {/* 添加新标签 */}
+          <Group gap="xs" align="flex-end">
+            <TextInput
+              label="添加新标签 / Add New Tag"
+              placeholder="输入新标签名称"
+              value={newTag}
+              onChange={(e) => setNewTag(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddTag();
+                }
+              }}
+              style={{ flex: 1 }}
+              styles={{
+                input: { borderRadius: 0, borderColor: 'var(--border-color)' },
+                label: { color: 'var(--text-primary)' }
+              }}
+            />
+            <Button
+              onClick={() => handleAddTag()}
+              size="md"
+              styles={{
+                root: {
+                  backgroundColor: 'var(--accent-secondary)',
+                  color: 'var(--text-primary)',
+                  borderRadius: 0,
+                  height: 36,
+                  '&:hover': {
+                    backgroundColor: 'var(--accent-secondary)',
+                    opacity: 0.8,
+                  },
+                },
+              }}
+            >
+              <IconPlus size={20} />
+            </Button>
+          </Group>
+          
+          {/* 标签库 */}
+          <Box>
+            <Text size="sm" mb="xs" style={{ color: 'var(--text-secondary)' }}>
+              选择其他书籍使用的标签
+            </Text>
+            {tags.length > 0 ? (
+              <Group gap="xs">
+                {tags.map((tag) => {
+                  const isSelected = bookTags.includes(tag.name);
+                  return (
+                    <Badge
+                      key={tag.id}
+                      size="lg"
+                      style={{
+                        backgroundColor: isSelected ? 'var(--accent-secondary)' : 'transparent',
+                        color: isSelected ? 'var(--bg-primary)' : 'var(--text-primary)',
+                        borderColor: 'var(--accent-secondary)',
+                        borderWidth: '1px',
+                        borderRadius: 0,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onClick={() => {
+                        if (isSelected) {
+                          handleRemoveTag(tag.name);
+                        } else {
+                          handleAddTagDirectly(tag.name);
+                        }
+                      }}
+                    >
+                      #{tag.name}
+                    </Badge>
+                  );
+                })}
+              </Group>
+            ) : (
+              <Text size="sm" style={{ color: 'var(--text-secondary)' }}>
+                暂无标签，请输入创建
+              </Text>
+            )}
+          </Box>
+          
+          <Group justify="flex-end" mt="md" gap="md" style={{ paddingRight: '20px' }}>
+            <SignatureButton 
+              text="取消 / Cancel"
+              onClick={() => setTagModalOpened(false)}
+              color="var(--text-secondary)"
+            />
+            <SignatureButton 
+              text="确认 / Confirm"
+              onClick={() => setTagModalOpened(false)}
+              color="var(--accent-secondary)"
+            />
+          </Group>
+        </Stack>
       </Modal>
     </Box>
   );

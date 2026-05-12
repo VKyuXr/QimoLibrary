@@ -2,6 +2,8 @@ use std::fs;
 use std::path::PathBuf;
 use crate::models::library::{BookMetadata, LibraryConfig, BookEntry};
 use crate::services::epub_parser;
+use crate::db::{BookRepository, get_database};
+use crate::db::models::Book;
 
 /// 检查书库路径是否存在
 pub fn check_library_path_exists(library_path: String) -> Result<bool, String> {
@@ -66,15 +68,15 @@ pub fn add_book_to_library(file_path: String, library_path: String) -> Result<Bo
         .to_string_lossy()
         .to_string();
     
-    println!("[Rust Debug] New book raw path: {}", absolute_path);
+    println!("[INFO] New book raw path: {}", absolute_path);
     // 使用统一的路径规范化工具
     let clean_path = crate::utils::path_utils::normalize_windows_path(&absolute_path);
-    println!("[Rust Debug] New book cleaned path: {}", clean_path);
+    println!("[INFO] New book cleaned path: {}", clean_path);
     
     // 提取EPUB元数据
     let epub_metadata = epub_parser::extract_epub_metadata(&source_path)
         .unwrap_or_else(|e| {
-            println!("[Rust Warning] 提取EPUB元数据失败: {}", e);
+            println!("[WARN] Failed to extract EPUB metadata: {}", e);
             epub_parser::EpubMetadata {
                 title: file_name.clone(),
                 author: "未知作者".to_string(),
@@ -93,7 +95,7 @@ pub fn add_book_to_library(file_path: String, library_path: String) -> Result<Bo
         
         if fs::write(&cover_file_path, cover_data).is_ok() {
             cover_path = Some(cover_filename);
-            println!("[Rust Debug] 封面图片已保存: {:?}", cover_file_path);
+            println!("[INFO] Cover image saved: {:?}", cover_file_path);
         }
     }
     
@@ -110,6 +112,7 @@ pub fn add_book_to_library(file_path: String, library_path: String) -> Result<Bo
         added_time: now.clone(),
         file_path: Some(clean_path),
         is_notebook: epub_metadata.is_notebook,
+        tags: Vec::new(),
     };
     
     let metadata_json = serde_json::to_string_pretty(&metadata)
@@ -120,6 +123,16 @@ pub fn add_book_to_library(file_path: String, library_path: String) -> Result<Bo
         .map_err(|e| format!("写入元数据文件失败: {}", e))?;
     
     update_library_config(&library_path, &metadata.id, &file_name)?;
+    
+    // 同步到数据库（如果可用）
+    if let Ok(db) = get_database() {
+        let mut book: Book = metadata.clone().into();
+        book.library_path = library_path.clone();
+        book.folder_name = file_name.clone();
+        if BookRepository::create(db, &book).is_ok() {
+            println!("[INFO] Book synced to database: {}", metadata.id);
+        }
+    }
     
     Ok(metadata)
 }
@@ -139,7 +152,7 @@ fn update_library_config(library_path: &str, book_id: &str, folder_name: &str) -
     });
     
     let new_json = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("序列化配置失败: {}", e))?;
+        .map_err(|e| format!("序列化配置文件失败: {}", e))?;
     
     fs::write(&config_path, new_json)
         .map_err(|e| format!("写入配置文件失败: {}", e))?;
@@ -160,6 +173,29 @@ pub fn get_library_books(library_path: String) -> Result<Vec<BookMetadata>, Stri
     let config: LibraryConfig = serde_json::from_str(&config_json)
         .map_err(|e| format!("解析配置文件失败: {}", e))?;
     
+    // 尝试从数据库获取标签
+    let db_tags = if let Ok(db) = get_database() {
+        println!("[INFO] Database available, querying tags...");
+        BookRepository::find_by_library(db, &library_path)
+            .map(|books| {
+                let tags_map: std::collections::HashMap<_, _> = books.into_iter()
+                    .map(|b| {
+                        println!("[DEBUG] Loaded book from DB: id={}, tags={:?}", b.id, b.tags);
+                        (b.id.clone(), b.tags)
+                    })
+                    .collect();
+                println!("[INFO] Total tags loaded from DB: {}", tags_map.len());
+                tags_map
+            })
+            .unwrap_or_else(|e| {
+                println!("[WARN] Failed to query tags from DB: {}", e);
+                std::collections::HashMap::new()
+            })
+    } else {
+        println!("[INFO] Database not available, skipping tag query");
+        std::collections::HashMap::new()
+    };
+    
     let mut books = Vec::new();
     
     for entry in &config.books {
@@ -176,14 +212,14 @@ pub fn get_library_books(library_path: String) -> Result<Vec<BookMetadata>, Stri
             // 自动修复：如果 file_path 为空，尝试根据文件名重建路径
             if metadata.file_path.is_none() || metadata.file_path.as_ref().unwrap().is_empty() {
                 let epub_file = book_folder.join(format!("{}.epub", entry.book_folder_name));
-                println!("[Rust Debug] Reconstructing path for: {}", entry.book_folder_name);
+                println!("[INFO] Reconstructing path for: {}", entry.book_folder_name);
                 if epub_file.exists() {
                     if let Ok(absolute_path) = epub_file.canonicalize() {
                         let mut path_str = absolute_path.to_string_lossy().to_string();
-                        println!("[Rust Debug] Raw canonical path: {}", path_str);
+                        println!("[DEBUG] Raw canonical path: {}", path_str);
                         // 使用统一的路径规范化工具
                         path_str = crate::utils::path_utils::normalize_windows_path(&path_str);
-                        println!("[Rust Debug] Cleaned path: {}", path_str);
+                        println!("[DEBUG] Cleaned path: {}", path_str);
                         metadata.file_path = Some(path_str);
                         
                         // 保存更新后的元数据
@@ -193,10 +229,27 @@ pub fn get_library_books(library_path: String) -> Result<Vec<BookMetadata>, Stri
                             .map_err(|e| format!("写入元数据文件失败: {}", e))?;
                     }
                 } else {
-                    println!("[Rust Debug] EPUB file not found at: {:?}", epub_file);
+                    println!("[WARN] EPUB file not found at: {:?}", epub_file);
                 }
             } else {
-                println!("[Rust Debug] Existing path for {}: {}", entry.book_folder_name, metadata.file_path.as_ref().unwrap());
+                println!("[DEBUG] Existing path for {}: {}", entry.book_folder_name, metadata.file_path.as_ref().unwrap());
+            }
+            
+            // 同步书籍到数据库（如果尚未存在）
+            if let Ok(db) = get_database() {
+                if BookRepository::find_by_id(db, &metadata.id).map_or(false, |opt| opt.is_none()) {
+                    let mut book: Book = metadata.clone().into();
+                    book.library_path = library_path.clone();
+                    book.folder_name = entry.book_folder_name.clone();
+                    if BookRepository::create(db, &book).is_ok() {
+                        println!("[INFO] Book synced to database: {}", metadata.id);
+                    }
+                }
+            }
+            
+            // 从数据库获取标签
+            if let Some(tags) = db_tags.get(&metadata.id) {
+                metadata.tags = tags.clone();
             }
             
             books.push(metadata);
@@ -233,7 +286,16 @@ pub fn delete_books(book_ids: Vec<String>, library_path: String) -> Result<(), S
         if book_folder.exists() {
             fs::remove_dir_all(&book_folder)
                 .map_err(|e| format!("删除书籍文件夹失败 {}: {}", entry.book_folder_name, e))?;
-            println!("[Rust Debug] Deleted book folder: {:?}", book_folder);
+            println!("[INFO] Deleted book folder: {:?}", book_folder);
+        }
+    }
+    
+    // 从数据库删除书籍记录
+    if let Ok(db) = get_database() {
+        for book_id in &book_ids {
+            if BookRepository::delete(db, book_id).is_ok() {
+                println!("[INFO] Deleted book from database: {}", book_id);
+            }
         }
     }
     
@@ -247,7 +309,7 @@ pub fn delete_books(book_ids: Vec<String>, library_path: String) -> Result<(), S
     fs::write(&config_path, new_json)
         .map_err(|e| format!("写入配置文件失败: {}", e))?;
     
-    println!("[Rust Debug] Deleted {} books", deleted_count);
+    println!("[INFO] Deleted {} books", deleted_count);
     
     Ok(())
 }
@@ -284,6 +346,12 @@ pub fn update_book_metadata(book_id: String, library_path: String, title: String
     let mut metadata: BookMetadata = serde_json::from_str(&metadata_json)
         .map_err(|e| format!("解析元数据失败: {}", e))?;
     
+    // 保存参数值用于后续数据库同步
+    let title_value = title.clone();
+    let author_value = author.clone();
+    let publisher_value = publisher.clone();
+    let description_value = description.clone();
+    
     // 更新字段
     metadata.title = title;
     metadata.author = author;
@@ -297,7 +365,20 @@ pub fn update_book_metadata(book_id: String, library_path: String, title: String
     fs::write(&metadata_path, updated_json)
         .map_err(|e| format!("写入元数据文件失败: {}", e))?;
     
-    println!("[Rust Debug] Updated metadata for book: {}", book_id);
+    println!("[INFO] Updated metadata for book: {}", book_id);
+    
+    // 同步更新到数据库
+    if let Ok(db) = get_database() {
+        if let Some(mut book) = BookRepository::find_by_id(db, &book_id).ok().flatten() {
+            book.title = title_value;
+            book.author = author_value;
+            book.publisher = publisher_value;
+            book.description = description_value;
+            if BookRepository::update(db, &book).is_ok() {
+                println!("[INFO] Synced metadata to database for book: {}", book_id);
+            }
+        }
+    }
     
     Ok(metadata)
 }

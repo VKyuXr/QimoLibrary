@@ -17,6 +17,8 @@ interface BookContextType {
   books: Book[];
   selectedBook: Book | null;
   selectBook: (book: Book | null) => void;
+  setSelectedBook: (book: Book | null) => void;
+  setBooks: React.Dispatch<React.SetStateAction<Book[]>>;
   addBook: (book: Book) => Promise<void>;
   removeBook: (id: string) => void;
   libraries: LibraryConfig[];
@@ -274,7 +276,9 @@ export const BookProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <BookContext.Provider value={{ 
       books, 
       selectedBook, 
-      selectBook, 
+      selectBook,
+      setSelectedBook,
+      setBooks,
       addBook, 
       removeBook,
       libraries,
